@@ -173,6 +173,20 @@ in X: a 3-odds slip about a third of the time, a 10-odds slip about a
 tenth. SportyBet's margin on every leg makes the real payout lower than the
 fair total, which is why single bets are the better way to use any edge.
 
+### Any match, from SportyBet's own odds
+
+The daily list only covers leagues with results history on openfootball.
+For any other match, including national teams and smaller leagues,
+`three_in_a_row_from_odds.py` works out the expected goals from the
+match's 1X2 and Over/Under 2.5 odds, then prices NO in the same way. Put
+the odds in a CSV (`match,home,draw,away,over,under,no`, where `no` is
+SportyBet's 3-in-a-row NO price if you have it) and run:
+
+```bash
+python three_in_a_row_from_odds.py todays_odds.csv
+python three_in_a_row_from_odds.py --cheat-sheet   # P(NO) for typical odds
+```
+
 ### Refreshing the research
 
 ```bash
