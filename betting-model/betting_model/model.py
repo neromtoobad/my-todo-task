@@ -29,6 +29,8 @@ import pandas as pd
 from scipy.optimize import minimize
 from scipy.stats import poisson
 
+from .streaks import streak_probability
+
 
 @dataclass
 class DixonColes:
@@ -117,14 +119,15 @@ class DixonColes:
     def predict(self, fixtures: pd.DataFrame) -> pd.DataFrame:
         """Outcome probabilities for each fixture (columns league, home, away).
 
-        Returns p_home/p_draw/p_away, p_over/p_under (2.5 goals) and the
-        expected goals. Rows with an unknown team are all NaN.
+        Returns p_home/p_draw/p_away, p_over/p_under (2.5 goals),
+        p_3row (either team scores 3 goals in a row) and the expected
+        goals. Rows with an unknown team are all NaN.
         """
         home_xg, away_xg = self.expected_goals(fixtures)
         out = pd.DataFrame(index=fixtures.index)
         out["xg_home"] = home_xg
         out["xg_away"] = away_xg
-        for col in ("p_home", "p_draw", "p_away", "p_over", "p_under"):
+        for col in ("p_home", "p_draw", "p_away", "p_over", "p_under", "p_3row"):
             out[col] = np.nan
 
         known = ~np.isnan(home_xg)
@@ -137,6 +140,7 @@ class DixonColes:
             out.loc[known, "p_away"] = grid[:, home_goals < away_goals].sum(axis=1)
             out.loc[known, "p_over"] = grid[:, home_goals + away_goals > 2.5].sum(axis=1)
             out.loc[known, "p_under"] = 1.0 - out.loc[known, "p_over"]
+            out.loc[known, "p_3row"] = streak_probability(grid, length=3, side="any")
         return out
 
     def _initial_params(self, init: DixonColes | None, n_teams: int, n_leagues: int) -> np.ndarray:

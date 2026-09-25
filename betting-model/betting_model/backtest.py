@@ -14,7 +14,7 @@ import pandas as pd
 
 from .model import DixonColes
 
-PROB_COLUMNS = ["p_home", "p_draw", "p_away", "p_over", "p_under"]
+PROB_COLUMNS = ["p_home", "p_draw", "p_away", "p_over", "p_under", "p_3row"]
 
 
 @dataclass

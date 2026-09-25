@@ -115,6 +115,73 @@ by the multi-season total, never by one good season.**
   football-data.co.uk's `fixtures.csv` and record the odds you could get
   against the closing odds for 4–6 weeks before staking real money.
 
+## "3 goals in a row" (SportyBet)
+
+SportyBet's "any team to score 3 goals in a row" market settles YES if
+either team scores three straight goals without the other side scoring in
+between (full time, including stoppage time; own goals count for the team
+credited). NO wins otherwise.
+
+### How the model prices it
+
+The Dixon-Coles model gives the chance of every final score. For a given
+final score, the model assumes every order of the goals is equally likely.
+A 3-1 win, for example, is a streak in 2 of its 4 possible orders (HHHA and
+AHHH yes; HAHH and HHAH no). Adding this up over all scores gives P(YES),
+and P(NO) = 1 - P(YES). The code is in `betting_model/streaks.py`.
+
+### Research findings
+
+These come from `research/three_in_a_row_study.py`, run on 1,517 matches
+with full goal order: the 2015/16 Premier League, La Liga, Serie A and
+Ligue 1, using StatsBomb open data.
+
+| Question | Finding |
+|---|---|
+| How often does it happen? | 21.7% of matches (between 19.5% in Serie A and 23.2% in the Premier League). Fair odds are about 4.60 for YES and 1.28 for NO. |
+| For a given final score, is every goal order equally likely? | Yes, as far as this data can tell: 138 streaks against 130 expected in the matches where the order decided the bet (z = +1.1). |
+| Can the model tell matches apart before kick-off? | Yes. The fifth of matches it rated least likely to have a streak had one 13.1% of the time, so NO won 87%. The fifth it rated most likely had one 34.7% of the time. |
+| Are its probabilities accurate? | Mostly. Tested the way the daily list works (three seasons of ratings), matches rated 27% came in at 27% and matches rated 46% at 47%. At the safe end, matches rated 12% came in at 14%, so NO is about 2 points less certain than shown there. The default 5% edge in the "take at" price covers this. |
+
+Limitations: the order-of-goals check and the accuracy test cover four top
+European leagues from a single season. Other leagues use the same model but
+have not been tested on real goal sequences.
+
+### Daily list
+
+```bash
+python three_in_a_row.py                          # today's matches, NO side
+python three_in_a_row.py --date 2026-10-10 --days 3
+python three_in_a_row.py --side yes
+```
+
+This covers every league openfootball has current fixtures for: the
+Premier League, Championship, La Liga, Bundesliga, Serie A, Ligue 1,
+Eredivisie, Primeira Liga and Brazil's Série A. Second divisions are loaded
+too, so promoted teams have ratings. Data comes from
+[openfootball](https://github.com/openfootball/football.json) and is cached
+in `data/openfootball/`.
+
+For each match you get P(NO), the fair NO odds, and a **"take at"** price
+(the fair odds plus a 5% edge). Find the match on SportyBet and only bet it
+if SportyBet's NO price is at least the "take at" number.
+
+The **slip builder** stacks the most likely legs and shows the total fair
+odds and the chance that every leg wins, marking where the slip passes
+3, 5 and 10 odds. At fair prices, a slip at total odds X wins about 1 time
+in X: a 3-odds slip about a third of the time, a 10-odds slip about a
+tenth. SportyBet's margin on every leg makes the real payout lower than the
+fair total, which is why single bets are the better way to use any edge.
+
+### Refreshing the research
+
+```bash
+python research/statsbomb_goal_order.py     # downloads about 500 MB, keeps a small CSV
+python -m research.three_in_a_row_study
+```
+
+Goal-order data provided by StatsBomb (open data, free with attribution).
+
 ## Tests
 
 ```bash
