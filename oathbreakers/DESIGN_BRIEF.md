@@ -22,7 +22,7 @@ Naming rule: the game is inspired by the reality-TV social deduction format but 
 | **Oathbreaker** (the traitors) | 3 | Survive to the end and take the whole pot | Who the other Oathbreakers are |
 
 - The player's role is dealt at random each season (about a 1 in 4 chance of being an Oathbreaker). The menu lets the player force a role.
-- **The Steward** is the host. They narrate, run the ceremonies and deal the twists, and they are not a contestant. **Host design is open:** the user is describing a new host (replacing the draft Lady Isolde Vane). "The Steward" is a placeholder title until then.
+- **The Laird** is the host: Lachlan Rook, the flamboyant Scottish owner of Ravenholt (full card in `CAST.md`). He is gleeful, theatrical, speaks in riddles, never breaks character, and arrives at breakfast in a new tartan-and-tweed couture outfit every day. He narrates, runs the ceremonies and deals the twists. He is not a contestant. He is an original character with no likeness to any real host.
 
 ## CORE LOOP (one in-game day)
 
@@ -54,7 +54,7 @@ Max pot: 26,000 gold. Recruitments and ultimatums can change the count, and the 
 - **Recruitment:** on the night after an Oathbreaker is exiled, the surviving Oathbreakers may recruit one Sworn instead of murdering. The Sworn may refuse (they stay Sworn, and there is no murder that night).
 - **Ultimatum:** if only one Oathbreaker remains and 5 or more players are alive, they may deliver an ultimatum instead of a normal recruit: join or be murdered on the spot.
 - **The Dagger:** won secretly in the Day 3 mission. The holder can make their vote count twice at one of the next 2 Round Tables. Using it is announced to the table.
-- **Ties:** revote among only the tied names (the tied players do not vote). If it is still tied, the Steward draws stones at random.
+- **Ties:** revote among only the tied names (the tied players do not vote). If it is still tied, the Laird draws stones at random.
 - **The Last Candle (finale):** with 4 or fewer left, each player votes END THE GAME or EXILE AGAIN. Ending requires a unanimous vote. Anyone exiled at the Last Candle leaves without revealing their role. The game also ends automatically when 2 remain.
 - **Payout:** only Sworn remain, so they split the pot equally. Any Oathbreaker remains, so the surviving Oathbreakers take it all.
 
@@ -80,9 +80,9 @@ Mouse or touch for everything. The game is fully playable on mobile.
 | # | Name | Type | How it plays | Clues / rewards |
 |---|---|---|---|---|
 | 1 | **THE SEALED VAULT** | Memory mini-game | A relay of 6 contestants each repeats a growing rune sequence (like a lock combination). The player plays their leg live; AI legs are simulated from each character's skill. Each correct leg adds 800 gold (plus a 200 perfect-run bonus). | Oathbreakers have a 35% chance to "slip" on purpose. The log shows who slipped and on which rune. The highest scorer finds the Shield. |
-| 2 | **THE CROSSROADS** | Story scene | Three teams carry gold chests through a forest by different paths. The player chooses a path and makes 3 choices along the way (help a stuck cart, trust a stranger's shortcut, split up or stay together). | One chest arrives lighter. It came from a team that has at least one Oathbreaker (true 80% of the time). The Steward offers a Shield to one volunteer at the cost of 1,500 gold from the pot. The volunteer stays secret, but everyone sees the pot drop. |
+| 2 | **THE CROSSROADS** | Story scene | Three teams carry gold chests through a forest by different paths. The player chooses a path and makes 3 choices along the way (help a stuck cart, trust a stranger's shortcut, split up or stay together). | One chest arrives lighter. It came from a team that has at least one Oathbreaker (true 80% of the time). The Laird offers a Shield to one volunteer at the cost of 1,500 gold from the pot. The volunteer stays secret, but everyone sees the pot drop. |
 | 3 | **THE LANTERN RUN** | Timing mini-game | Lanterns swing across the moat bridge, and the player lights each one when its ring aligns (SPACE or tap). 20 lanterns, with the speed rising each set of 5. Team total sets the gold. | The top scorer wins the Dagger (secret). The per-player lantern counts are posted, and a lowball score from a strong player is a tell. |
-| 4 | **THE MIRROR HALL** | Story scene | The player walks a hall of mirrors with 3 riddle doors. Right answers add gold. At the end the Steward offers a Glimpse: spend 2,000 gold of the pot to learn a list of 3 names, at least one of which is an Oathbreaker (if any remain). | The Glimpse is public if bought. The Shield goes to whoever solves the final riddle fastest. |
+| 4 | **THE MIRROR HALL** | Story scene | The player walks a hall of mirrors with 3 riddle doors. Right answers add gold. At the end the Laird offers a Glimpse: spend 2,000 gold of the pot to learn a list of 3 names, at least one of which is an Oathbreaker (if any remain). | The Glimpse is public if bought. The Shield goes to whoever solves the final riddle fastest. |
 
 ## AI CAST (11 contestants)
 
@@ -136,7 +136,7 @@ Locked style prompt for all images: "Cinematic photoreal, moody candlelit Scotti
 | Cast hero portraits | 11 | 3:4 photoreal |
 | Cast expression variants | 33 | 3 extra per character, same identity |
 | Player avatars | 6 | 3:4, same style |
-| The Steward | 1 portrait + 3 video clips | Intro, Round Table open, Last Candle |
+| The Laird (host) | 6 outfit portraits + 6 video clips | One portrait per day in that day's outfit (Day 0-4 + finale) and one 5s breakfast-entrance clip per day showing off the look |
 | Exile reveal clips | 11 | 5s each: the character stands and turns to the table (no speech; the role reveal is an audio line plus an overlay) |
 | Backgrounds (16:9) | 10 | Castle exterior at dusk (menu), Great Hall breakfast, Gallery, Round Table chamber, Tower, Vault, Forest crossroads, Moat bridge, Mirror hall, Last Candle fire pit |
 | Ambient video loops | 2 | Round Table candle flicker, castle exterior with drifting clouds |
@@ -147,7 +147,7 @@ Locked style prompt for all images: "Cinematic photoreal, moody candlelit Scotti
 
 - **Music:** main theme (brooding strings with a low choir), Round Table tension loop (ticking pulse and cello), night theme (sparse piano, wind), mission theme (driving percussion, adventurous), Last Candle theme (building strings), plus two stings: SWORN VICTORY and BETRAYAL.
 - **SFX:** wax seal stamp, vote card slap on oak, candle snuff (exile), door creak and footsteps (breakfast), gold coin cascade (pot increase), shield shimmer, dagger unsheathe, crow caw (night), heartbeat under vote reveals, rune chime and fail buzz, lantern whoosh.
-- **Voices:** one generated voice per character (11) with two reveal lines each ("I am Sworn." / "I am an Oathbreaker."), and the Steward's narration for key moments (about 25 lines).
+- **Voices:** one generated voice per character (11) with two reveal lines each ("I am Sworn." / "I am an Oathbreaker."), and the Laird's narration for key moments (about 30 lines, big exaggerated Scottish delivery).
 - A sound toggle is in the pause menu. Music ducks under voice lines.
 
 ## UI COPY (all literal, English)
@@ -164,7 +164,8 @@ Locked style prompt for all images: "Cinematic photoreal, moody candlelit Scotti
 - Version line: `Oathbreakers v1.0`
 
 **Role reveal**
-- Steward: `Tonight, three among you will be chosen. The rest of you... will have to find them.`
+- Laird (arrival): `Welcome to Ravenholt, my darlings. Twelve of you walked in. Not all of you will walk out... and three of you are lying to my face already. De-li-cious.`
+- Laird: `Tonight, three among you will be chosen. The rest of you... will have to find them.`
 - Card prompt: `TAP TO BREAK THE SEAL`
 - Sworn: `YOU ARE SWORN` / `Find the Oathbreakers. Exile them. Share the gold.`
 - Oathbreaker: `YOU ARE AN OATHBREAKER` / `Blend in. Murder by night. Take it all.` / `YOUR FELLOW OATHBREAKERS: <name>, <name>`
@@ -182,6 +183,7 @@ Locked style prompt for all images: "Cinematic photoreal, moody candlelit Scotti
 
 **Breakfast**
 - `BREAKFAST - DAY <n>` / `The doors open...`
+- Laird: `Somebody didn't come down to breakfast. How terribly rude of them.`
 - `<name> did not come to breakfast.` then `<NAME> HAS BEEN MURDERED`
 - Failed murder: `Everyone came down to breakfast. Someone survived the night.`
 
@@ -192,19 +194,22 @@ Locked style prompt for all images: "Cinematic photoreal, moody candlelit Scotti
 - Buttons: `EAVESDROP (<n> LEFT)`, `END CONVERSATION`, `GO TO THE ROUND TABLE`
 
 **Round Table**
-- Steward: `Welcome to the Round Table. Somebody here is not who they say they are.`
+- Laird: `Welcome to the Round Table. Somebody here is not who they say they are.`
 - `SPEAK UP (<n> LEFT)` with options `ACCUSE...`, `DEFEND...`, `DEFEND MYSELF`, `STAY SILENT`
+- Laird: `Pick up your quills. Write a name. Make it count.`
 - `WRITE A NAME` / `CONFIRM VOTE` / `USE THE DAGGER` (when held)
 - Reveal: `<name> votes for <name>.` then a spoken reason
 - Dagger used: `<name> draws the Dagger. Their vote counts twice.`
 - Tie: `IT'S A TIE. The tied players will plead their case. Vote again.`
-- Second tie: `Still tied. The Steward draws the stones.`
-- Exile: `<name>, you have been exiled. Please tell the table who you are.` then `I AM SWORN` or `I AM AN OATHBREAKER`
+- Second tie: `Still tied. The Laird draws the stones.`
+- Exile: `<name>, you have been exiled. Please. Tell the table. Who... are... you?` then `I AM SWORN` or `I AM AN OATHBREAKER`
+- Laird on an Oathbreaker: `Ooh. Got one.` / on a Sworn: `Oh dear. Oh dear, oh dear. You've banished one of your own.`
 
 **Night (Sworn)**
 - `NIGHT FALLS OVER RAVENHOLT` / `Lock your door. Pray you see breakfast.`
 
 **Night (Oathbreaker)**
+- Laird: `Good evening, my wee monsters. Who's it to be?`
 - `THE TOWER` / `Choose who will not wake.`
 - `MARK FOR MURDER` / `CONFIRM MURDER`
 - After an Oathbreaker falls: `One of us has fallen. RECRUIT A SWORN?` with `RECRUIT` / `MURDER INSTEAD`
@@ -220,6 +225,7 @@ Locked style prompt for all images: "Cinematic photoreal, moody candlelit Scotti
 - `You won the DAGGER. Your vote counts twice at one of the next two Round Tables.`
 
 **The Last Candle**
+- Laird: `The last candle is lit. When it goes out, so does the game.`
 - `THE LAST CANDLE` / `<n> remain. Do you END THE GAME, or EXILE AGAIN?`
 - `END THE GAME` / `EXILE AGAIN` / `The vote must be unanimous to end.`
 - `Someone chose to exile again.`

@@ -143,8 +143,32 @@ Tells only appear some of the time, and mostly when the character is lying. They
 
 ---
 
-## The Steward (host, not a contestant)
-**Open - the user is describing a new host.** (The draft host, Lady Isolde Vane, was not kept.)
+## The Host (not a contestant)
+**Lachlan Rook, the Laird of Ravenholt** - 61 - Scottish Highlands
+- **Who:** the castle's flamboyant owner and the show's host. He treats hosting as the role of a lifetime and is the most over-the-top character in the building. His energy gives everyone else permission to play big.
+- **Personality:** gleeful, mischievous, with a dash of Bond-villain menace. He adores the drama, loves his contestants and loves watching them betray each other even more. He speaks in riddles and never breaks character. He gasps at reveals, claps with delight at twists, and swishes his cape when he exits.
+- **Voice:** a big, rolling, exaggerated Scottish accent. He stretches words for drama ("De-li-cious.") and drops to a whisper before bad news.
+- **Look:** tall and broad-shouldered, with copper-red hair swept back and silver at the temples, a neatly groomed copper-and-silver beard, and sharp green eyes. He wears a silver raven signet ring and carries a raven-head cane. (An original character: no likeness to any real host.)
+- **Signature feature - a new outfit every day:** Scottish castle couture of tartan, tweed and wool with a modern, fashion-forward twist. Each morning's breakfast entrance reveals the day's look:
+  | Day | Outfit |
+  |---|---|
+  | 0 Arrival | Floor-length crimson tartan cape over a black velvet suit, silver raven brooch |
+  | 1 | Emerald tweed three-piece, fur-trimmed stole, black leather gloves |
+  | 2 | Black-and-gold tartan kilt, studded leather biker jacket, knee-high boots |
+  | 3 | Plum velvet frock coat, lace cravat, tartan trousers, raven-head cane |
+  | 4 | All-white wool suit with a blood-red tartan sash ("dressed for a funeral, backwards") |
+  | Finale | Raven-feather cape over a charcoal tartan suit, gold chain collar |
+- **Signature lines:**
+  - Arrival: "Welcome to Ravenholt, my darlings. Twelve of you walked in. Not all of you will walk out... and three of you are lying to my face already. De-li-cious."
+  - Breakfast: "Somebody didn't come down to breakfast. How terribly rude of them."
+  - Round Table: "Pick up your quills. Write a name. Make it count."
+  - Reveal: "Please. Tell the table. Who... are... you?"
+  - Oathbreaker caught: "Ooh. Got one."
+  - Sworn exiled: "Oh dear. Oh dear, oh dear. You've banished one of your own."
+  - Twist: "I have a wee surprise for you..."
+  - Tower (to the Oathbreakers): "Good evening, my wee monsters. Who's it to be?"
+  - Last Candle: "The last candle is lit. When it goes out, so does the game."
+  - Riddle: "A raven never tells you which way it will fly."
 
 ## Relationship web (drama hooks)
 - **Rafa and Zara:** tabloid exes, so any vote between them is personal.
