@@ -1,4 +1,6 @@
-# OATHBREAKERS - Design Brief (v1, draft for approval)
+# OATHBREAKERS - Design Brief (v1, built and deployed)
+
+Live: https://oathbreakers.higgsfield.app (Higgsfield game, deployed from this brief). Source: `oathbreakers/game/`.
 
 Create and deploy a single-player browser game via the Higgsfield pipeline. Read the game creation instructions first, then build and deploy it. Ask before publishing to the marketplace.
 
@@ -248,9 +250,9 @@ Locked style prompt for all images: "Cinematic photoreal, moody candlelit Scotti
 
 - **Client:** plain JavaScript, no build step. DOM + CSS for the UI, and `<canvas>` for the two mini-games. Generated videos play in `<video>` elements from Higgsfield CDN URLs.
 - **Engine:** a deterministic phase state machine (`DAY_START -> BREAKFAST -> MISSION -> GALLERY -> ROUND_TABLE -> NIGHT -> ...`) with a seeded RNG per season. The engine owns all game state and every decision.
-- **Dialogue:** Claude via a small server endpoint (`server.js`) that holds the API key as a deploy secret. The key never ships to the browser. Fast model (`claude-haiku-4-5-20251001`) for Gallery chat and reactions, and a stronger model (`claude-sonnet-5-5`) for Round Table speeches. Rate limit: about 250 calls per season per session.
-- **Offline fallback:** a template dialogue bank per character archetype, so the game is fully playable if the dialogue endpoint is unavailable.
-- **Save:** autosave to `localStorage` at every phase change, so `CONTINUE SEASON` resumes.
+- **Dialogue (v1, as shipped):** no external AI API. The engine writes every line from authored, per-character dialogue banks (signature lines, accusations, defenses, vote reasons, tells), so the game is free to run and works offline. Typed Gallery chat is parsed for intent (names, "trust", "shield", "mission", "suspect"). Live LLM dialogue is a possible v2 upgrade through a server endpoint with the key stored as a website secret.
+- **Server:** the Higgsfield game template (Cloudflare Durable Object room). `src/logic.js` is the whole engine (pure, seeded); `viewFor` hides every secret role, so roles never reach the browser. Each browser gets its own private room, and the season persists across reloads.
+- **Save:** the room persists the season server-side; reopening the page offers `CONTINUE SEASON`.
 - **Hosting:** follow the Higgsfield game instructions' tier for a game with a server endpoint. `index.html` (and `server.js`) at the zip root, everything else under `assets/`.
 
 ## DEPLOY AND MARKETPLACE
