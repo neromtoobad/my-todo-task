@@ -1,0 +1,170 @@
+id,role,type,description,size/ratio,style line ref,source
+ada_neutral,cast portrait,image,ada neutral,3:4,STYLE FORMULA,generate
+ada_suspicious,cast portrait,image,ada suspicious,3:4,STYLE FORMULA,generate
+ada_shocked,cast portrait,image,ada shocked,3:4,STYLE FORMULA,generate
+ada_smug,cast portrait,image,ada smug,3:4,STYLE FORMULA,generate
+rafa_neutral,cast portrait,image,rafa neutral,3:4,STYLE FORMULA,generate
+rafa_suspicious,cast portrait,image,rafa suspicious,3:4,STYLE FORMULA,generate
+rafa_shocked,cast portrait,image,rafa shocked,3:4,STYLE FORMULA,generate
+rafa_smug,cast portrait,image,rafa smug,3:4,STYLE FORMULA,generate
+minseo_neutral,cast portrait,image,minseo neutral,3:4,STYLE FORMULA,generate
+minseo_suspicious,cast portrait,image,minseo suspicious,3:4,STYLE FORMULA,generate
+minseo_shocked,cast portrait,image,minseo shocked,3:4,STYLE FORMULA,generate
+minseo_smug,cast portrait,image,minseo smug,3:4,STYLE FORMULA,generate
+celia_neutral,cast portrait,image,celia neutral,3:4,STYLE FORMULA,generate
+celia_suspicious,cast portrait,image,celia suspicious,3:4,STYLE FORMULA,generate
+celia_shocked,cast portrait,image,celia shocked,3:4,STYLE FORMULA,generate
+celia_smug,cast portrait,image,celia smug,3:4,STYLE FORMULA,generate
+marcus_neutral,cast portrait,image,marcus neutral,3:4,STYLE FORMULA,generate
+marcus_suspicious,cast portrait,image,marcus suspicious,3:4,STYLE FORMULA,generate
+marcus_shocked,cast portrait,image,marcus shocked,3:4,STYLE FORMULA,generate
+marcus_smug,cast portrait,image,marcus smug,3:4,STYLE FORMULA,generate
+marisol_neutral,cast portrait,image,marisol neutral,3:4,STYLE FORMULA,generate
+marisol_suspicious,cast portrait,image,marisol suspicious,3:4,STYLE FORMULA,generate
+marisol_shocked,cast portrait,image,marisol shocked,3:4,STYLE FORMULA,generate
+marisol_smug,cast portrait,image,marisol smug,3:4,STYLE FORMULA,generate
+kenji_neutral,cast portrait,image,kenji neutral,3:4,STYLE FORMULA,generate
+kenji_suspicious,cast portrait,image,kenji suspicious,3:4,STYLE FORMULA,generate
+kenji_shocked,cast portrait,image,kenji shocked,3:4,STYLE FORMULA,generate
+kenji_smug,cast portrait,image,kenji smug,3:4,STYLE FORMULA,generate
+tomas_neutral,cast portrait,image,tomas neutral,3:4,STYLE FORMULA,generate
+tomas_suspicious,cast portrait,image,tomas suspicious,3:4,STYLE FORMULA,generate
+tomas_shocked,cast portrait,image,tomas shocked,3:4,STYLE FORMULA,generate
+tomas_smug,cast portrait,image,tomas smug,3:4,STYLE FORMULA,generate
+zara_neutral,cast portrait,image,zara neutral,3:4,STYLE FORMULA,generate
+zara_suspicious,cast portrait,image,zara suspicious,3:4,STYLE FORMULA,generate
+zara_shocked,cast portrait,image,zara shocked,3:4,STYLE FORMULA,generate
+zara_smug,cast portrait,image,zara smug,3:4,STYLE FORMULA,generate
+kwame_neutral,cast portrait,image,kwame neutral,3:4,STYLE FORMULA,generate
+kwame_suspicious,cast portrait,image,kwame suspicious,3:4,STYLE FORMULA,generate
+kwame_shocked,cast portrait,image,kwame shocked,3:4,STYLE FORMULA,generate
+kwame_smug,cast portrait,image,kwame smug,3:4,STYLE FORMULA,generate
+tayla_neutral,cast portrait,image,tayla neutral,3:4,STYLE FORMULA,generate
+tayla_suspicious,cast portrait,image,tayla suspicious,3:4,STYLE FORMULA,generate
+tayla_shocked,cast portrait,image,tayla shocked,3:4,STYLE FORMULA,generate
+tayla_smug,cast portrait,image,tayla smug,3:4,STYLE FORMULA,generate
+host_0,host portrait,image,host 0,3:4,STYLE FORMULA,generate
+host_1,host portrait,image,host 1,3:4,STYLE FORMULA,generate
+host_2,host portrait,image,host 2,3:4,STYLE FORMULA,generate
+host_3,host portrait,image,host 3,3:4,STYLE FORMULA,generate
+host_4,host portrait,image,host 4,3:4,STYLE FORMULA,generate
+host_5,host portrait,image,host 5,3:4,STYLE FORMULA,generate
+av_0,player avatar,image,av 0,3:4,STYLE FORMULA,generate
+av_1,player avatar,image,av 1,3:4,STYLE FORMULA,generate
+av_2,player avatar,image,av 2,3:4,STYLE FORMULA,generate
+av_3,player avatar,image,av 3,3:4,STYLE FORMULA,generate
+av_4,player avatar,image,av 4,3:4,STYLE FORMULA,generate
+av_5,player avatar,image,av 5,3:4,STYLE FORMULA,generate
+bg_exterior,scene background,image,bg exterior,16:9,STYLE FORMULA,generate
+bg_breakfast,scene background,image,bg breakfast,16:9,STYLE FORMULA,generate
+bg_gallery,scene background,image,bg gallery,16:9,STYLE FORMULA,generate
+bg_roundtable,scene background,image,bg roundtable,16:9,STYLE FORMULA,generate
+bg_tower,scene background,image,bg tower,16:9,STYLE FORMULA,generate
+bg_vault,scene background,image,bg vault,16:9,STYLE FORMULA,generate
+bg_crossroads,scene background,image,bg crossroads,16:9,STYLE FORMULA,generate
+bg_lantern,scene background,image,bg lantern,16:9,STYLE FORMULA,generate
+bg_mirror,scene background,image,bg mirror,16:9,STYLE FORMULA,generate
+bg_candle,scene background,image,bg candle,16:9,STYLE FORMULA,generate
+favicon,favicon/role seal,image,favicon,1:1,STYLE FORMULA,generate
+exile_ada,exile reveal,video,exile ada,9:16,STYLE FORMULA (start frame),generate
+exile_rafa,exile reveal,video,exile rafa,9:16,STYLE FORMULA (start frame),generate
+exile_minseo,exile reveal,video,exile minseo,9:16,STYLE FORMULA (start frame),generate
+exile_celia,exile reveal,video,exile celia,9:16,STYLE FORMULA (start frame),generate
+exile_marcus,exile reveal,video,exile marcus,9:16,STYLE FORMULA (start frame),generate
+exile_marisol,exile reveal,video,exile marisol,9:16,STYLE FORMULA (start frame),generate
+exile_kenji,exile reveal,video,exile kenji,9:16,STYLE FORMULA (start frame),generate
+exile_tomas,exile reveal,video,exile tomas,9:16,STYLE FORMULA (start frame),generate
+exile_zara,exile reveal,video,exile zara,9:16,STYLE FORMULA (start frame),generate
+exile_kwame,exile reveal,video,exile kwame,9:16,STYLE FORMULA (start frame),generate
+exile_tayla,exile reveal,video,exile tayla,9:16,STYLE FORMULA (start frame),generate
+hostv_0,host entrance,video,hostv 0,9:16,STYLE FORMULA (start frame),generate
+hostv_1,host entrance,video,hostv 1,9:16,STYLE FORMULA (start frame),generate
+hostv_2,host entrance,video,hostv 2,9:16,STYLE FORMULA (start frame),generate
+hostv_3,host entrance,video,hostv 3,9:16,STYLE FORMULA (start frame),generate
+hostv_4,host entrance,video,hostv 4,9:16,STYLE FORMULA (start frame),generate
+hostv_5,host entrance,video,hostv 5,9:16,STYLE FORMULA (start frame),generate
+loop_exterior,ambient loop,video,loop exterior,16:9,STYLE FORMULA (start frame),generate
+loop_roundtable,ambient loop,video,loop roundtable,16:9,STYLE FORMULA (start frame),generate
+sig_ada,voice,audio,sig ada,-,-,generate
+sworn_ada,voice,audio,sworn ada,-,-,generate
+oath_ada,voice,audio,oath ada,-,-,generate
+sig_rafa,voice,audio,sig rafa,-,-,generate
+sworn_rafa,voice,audio,sworn rafa,-,-,generate
+oath_rafa,voice,audio,oath rafa,-,-,generate
+sig_minseo,voice,audio,sig minseo,-,-,generate
+sworn_minseo,voice,audio,sworn minseo,-,-,generate
+oath_minseo,voice,audio,oath minseo,-,-,generate
+sig_celia,voice,audio,sig celia,-,-,generate
+sworn_celia,voice,audio,sworn celia,-,-,generate
+oath_celia,voice,audio,oath celia,-,-,generate
+sig_marcus,voice,audio,sig marcus,-,-,generate
+sworn_marcus,voice,audio,sworn marcus,-,-,generate
+oath_marcus,voice,audio,oath marcus,-,-,generate
+sig_marisol,voice,audio,sig marisol,-,-,generate
+sworn_marisol,voice,audio,sworn marisol,-,-,generate
+oath_marisol,voice,audio,oath marisol,-,-,generate
+sig_kenji,voice,audio,sig kenji,-,-,generate
+sworn_kenji,voice,audio,sworn kenji,-,-,generate
+oath_kenji,voice,audio,oath kenji,-,-,generate
+sig_tomas,voice,audio,sig tomas,-,-,generate
+sworn_tomas,voice,audio,sworn tomas,-,-,generate
+oath_tomas,voice,audio,oath tomas,-,-,generate
+sig_zara,voice,audio,sig zara,-,-,generate
+sworn_zara,voice,audio,sworn zara,-,-,generate
+oath_zara,voice,audio,oath zara,-,-,generate
+sig_kwame,voice,audio,sig kwame,-,-,generate
+sworn_kwame,voice,audio,sworn kwame,-,-,generate
+oath_kwame,voice,audio,oath kwame,-,-,generate
+sig_tayla,voice,audio,sig tayla,-,-,generate
+sworn_tayla,voice,audio,sworn tayla,-,-,generate
+oath_tayla,voice,audio,oath tayla,-,-,generate
+m_theme,music,audio,m theme,-,-,generate
+m_roundtable,music,audio,m roundtable,-,-,generate
+m_night,music,audio,m night,-,-,generate
+m_mission,music,audio,m mission,-,-,generate
+m_finale,music,audio,m finale,-,-,generate
+m_sting_s,music,audio,m sting s,-,-,generate
+m_sting_o,music,audio,m sting o,-,-,generate
+s_seal,sfx,audio,s seal,-,-,generate
+s_slap,sfx,audio,s slap,-,-,generate
+s_snuff,sfx,audio,s snuff,-,-,generate
+s_door,sfx,audio,s door,-,-,generate
+s_coins,sfx,audio,s coins,-,-,generate
+s_shimmer,sfx,audio,s shimmer,-,-,generate
+s_dagger,sfx,audio,s dagger,-,-,generate
+s_crow,sfx,audio,s crow,-,-,generate
+s_heartbeat,sfx,audio,s heartbeat,-,-,generate
+s_rune,sfx,audio,s rune,-,-,generate
+s_fail,sfx,audio,s fail,-,-,generate
+s_whoosh,sfx,audio,s whoosh,-,-,generate
+s_gasp,sfx,audio,s gasp,-,-,generate
+l_welcome,voice,audio,l welcome,-,-,generate
+l_chosen,voice,audio,l chosen,-,-,generate
+l_breakfast,voice,audio,l breakfast,-,-,generate
+l_lucky,voice,audio,l lucky,-,-,generate
+l_mission,voice,audio,l mission,-,-,generate
+l_vault,voice,audio,l vault,-,-,generate
+l_crossroads,voice,audio,l crossroads,-,-,generate
+l_lantern,voice,audio,l lantern,-,-,generate
+l_mirror,voice,audio,l mirror,-,-,generate
+l_potgrows,voice,audio,l potgrows,-,-,generate
+l_roundtable,voice,audio,l roundtable,-,-,generate
+l_quills,voice,audio,l quills,-,-,generate
+l_tie,voice,audio,l tie,-,-,generate
+l_stones,voice,audio,l stones,-,-,generate
+l_whoareyou,voice,audio,l whoareyou,-,-,generate
+l_gotone,voice,audio,l gotone,-,-,generate
+l_ohdear,voice,audio,l ohdear,-,-,generate
+l_bed,voice,audio,l bed,-,-,generate
+l_monsters,voice,audio,l monsters,-,-,generate
+l_newblood,voice,audio,l newblood,-,-,generate
+l_offer,voice,audio,l offer,-,-,generate
+l_shield,voice,audio,l shield,-,-,generate
+l_dagger,voice,audio,l dagger,-,-,generate
+l_surprise,voice,audio,l surprise,-,-,generate
+l_lastcandle,voice,audio,l lastcandle,-,-,generate
+l_endorexile,voice,audio,l endorexile,-,-,generate
+l_swin,voice,audio,l swin,-,-,generate
+l_owin,voice,audio,l owin,-,-,generate
+l_riddle,voice,audio,l riddle,-,-,generate
+l_glimpse,voice,audio,l glimpse,-,-,generate
