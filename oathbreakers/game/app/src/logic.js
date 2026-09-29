@@ -339,7 +339,7 @@ function startMission(s, r) {
     s.phase = "M_RESULT";
     s.sc = {
       k: "M_RESULT", bg: "gallery", music: "roundtable",
-      lines: [laird("No mission today, my darlings. Just each other. Enjoy.", "l_riddle", "smug")],
+      lines: [laird("No mission today, my darlings. Just each other. Enjoy.", "", "smug")],
       next: "TO THE GALLERY",
     };
     return;
@@ -766,7 +766,7 @@ function startRoundTable(s, r) {
   s.phase = "RT";
   s.acc = {};
   const lines = [];
-  if (s.final) lines.push(laird("Then back to the table. One more of you leaves... and nobody will know who they were.", "l_endorexile"));
+  if (s.final) lines.push(laird("Then back to the table. One more of you leaves... and nobody will know who they were.", ""));
   else lines.push(laird("Welcome to the Round Table. Somebody here is not who they say they are.", "l_roundtable"));
   const speakers = r.shuffle(aiAlive(s).map((p) => p.id)).filter((id) => r.chance(0.3 + 0.1 * BY_ID[id].loud)).slice(0, 6);
   if (!speakers.length && aiAlive(s).length) speakers.push(aiAlive(s)[0].id);
@@ -1684,5 +1684,6 @@ export function viewFor(state, playerId) {
     journal: s.journal.slice(-MAX_JOURNAL),
     sc: s.sc,
     final: !!s.final,
+    votes: (s.votes || []).slice(-8),
   };
 }

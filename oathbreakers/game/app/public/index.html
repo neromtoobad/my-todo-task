@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Oathbreakers - Ravenholt Castle</title>
+    <meta name="description" content="Twelve strangers. One castle. Three liars. Build the prize pot on missions, work the room in private, and vote at the Round Table to exile the Oathbreakers before they murder you in the night." />
+    <meta property="og:title" content="Oathbreakers" />
+    <meta property="og:description" content="Twelve strangers. One castle. Three liars. Build the prize pot on missions, work the room in private, and vote at the Round Table to exile the Oathbreakers before they murder you in the night. Every season the roles are reshuffled, and the cast remembers everything you say." />
+    <meta property="og:image" content="__OG_IMAGE__" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="icon" href="__FAVICON__" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;900&family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <div id="stage">
+      <div id="bg"><img id="bgImg" alt="" /><video id="bgVid" muted loop playsinline preload="auto"></video></div>
+      <div id="vignette"></div>
+      <div id="embers"></div>
+
+      <header id="hud" hidden>
+        <div class="hud-left">
+          <span id="hudPhase" class="chip">DAY 1</span>
+          <span id="hudPot" class="chip gold">POT: 0 GOLD</span>
+          <span id="hudLeft" class="chip">12 REMAIN</span>
+        </div>
+        <div class="hud-right">
+          <span id="hudShield" class="chip badge" hidden>SHIELDED TONIGHT</span>
+          <span id="hudDagger" class="chip badge" hidden>DAGGER</span>
+          <button id="hudRole" class="chip role" type="button" title="Hold R to peek">HOLD R TO PEEK</button>
+          <button id="hudJournal" class="chip btn" type="button">JOURNAL (J)</button>
+          <button id="hudSound" class="chip btn icon" type="button" aria-label="Toggle sound">♪</button>
+          <button id="hudMenu" class="chip btn icon" type="button" aria-label="Pause menu">☰</button>
+        </div>
+      </header>
+
+      <main id="scene"></main>
+
+      <section id="dialog" hidden>
+        <div id="dlgPortrait"><img alt="" /></div>
+        <div id="dlgBody">
+          <div id="dlgName"></div>
+          <div id="dlgText"></div>
+          <div id="dlgHint">Click or press SPACE</div>
+        </div>
+      </section>
+
+      <div id="overlay" hidden></div>
+      <div id="toast" hidden></div>
+      <div id="flash"></div>
+    </div>
+    <script type="module" src="/client.js"></script>
+  </body>
+</html>
