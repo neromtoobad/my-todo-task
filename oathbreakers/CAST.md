@@ -1,4 +1,4 @@
-# OATHBREAKERS - Cast (draft v1, for editing)
+# OATHBREAKERS - Cast (v1, locked)
 
 Direction: global mix, invented celebrities. Every character is fictional and is not based on any real person.
 
@@ -144,7 +144,7 @@ Tells only appear some of the time, and mostly when the character is lying. They
 ---
 
 ## The Steward (host, not a contestant)
-**Lady Isolde Vane** - the keeper of Ravenholt. Silver hair, high-collared black velvet coat, ring of old iron keys at her belt. Calm, amused, slightly menacing. She never raises her voice.
+**Open - the user is describing a new host.** (The draft host, Lady Isolde Vane, was not kept.)
 
 ## Relationship web (drama hooks)
 - **Rafa and Zara:** tabloid exes, so any vote between them is personal.

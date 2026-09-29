@@ -22,7 +22,7 @@ Naming rule: the game is inspired by the reality-TV social deduction format but 
 | **Oathbreaker** (the traitors) | 3 | Survive to the end and take the whole pot | Who the other Oathbreakers are |
 
 - The player's role is dealt at random each season (about a 1 in 4 chance of being an Oathbreaker). The menu lets the player force a role.
-- **The Steward** is the host: an original character (Lady Isolde Vane, silver-haired, high-collared black velvet coat, a ring of old iron keys at her belt). She narrates, runs the ceremonies and deals the twists. She is not a contestant.
+- **The Steward** is the host. They narrate, run the ceremonies and deal the twists, and they are not a contestant. **Host design is open:** the user is describing a new host (replacing the draft Lady Isolde Vane). "The Steward" is a placeholder title until then.
 
 ## CORE LOOP (one in-game day)
 
@@ -90,21 +90,25 @@ Rule: the engine decides, and Claude speaks. Votes, murders, recruitments and sa
 
 Each character has: name, age, job, 4 trait sliders (Perception, Deception, Loudness, Loyalty), a speech style, a backstory, a secret role, a memory log (what they saw, heard and were told) and a suspicion score toward every other player.
 
-| # | Name | Age | Job | Archetype | Voice |
-|---|---|---|---|---|---|
-| 1 | Maeve Callaghan | 34 | Pub landlady, Galway | Warm, sharp people-reader | Irish, quick and teasing |
-| 2 | Theo Adeyemi | 29 | Junior doctor, London | Calm, logical, cautious | Soft-spoken, precise |
-| 3 | Rupert Ashcombe | 61 | Retired barrister | Pompous persuader | Plummy, theatrical |
-| 4 | Priya Nair | 26 | True-crime podcaster | Overconfident sleuth | Fast, excitable |
-| 5 | Duncan Frazer | 45 | Highland gamekeeper | Quiet, blunt | Low Scottish burr |
-| 6 | Sofia Marquez | 38 | Casino poker dealer | Unreadable strategist | Dry, measured |
-| 7 | Jordan Blake | 23 | Fitness influencer | Loud, emotional, loyal | Big energy |
-| 8 | Hattie Pryce | 52 | Headteacher | Organizer, moral compass | Firm, motherly |
-| 9 | Kenji Watanabe | 41 | Stage magician | Misdirector, joker | Playful, sly |
-| 10 | Amara Okafor | 31 | Crisis PR consultant | Smooth spin doctor | Polished, calm |
-| 11 | Eddie Novak | 57 | Taxi driver | Folksy gossip | Chatty, warm |
+Cast: a global mix of invented celebrities (locked). Full cards with traits, Sworn and Oathbreaker play styles, tells, voice, look and signature lines are in `CAST.md`. Every character is fictional and not based on any real person.
 
-Plus 6 selectable player avatars (3 women, 3 men, varied ages and ethnicities).
+| # | Name | Age | From | Famous for | Tell (when lying) |
+|---|---|---|---|---|---|
+| 1 | Adaeze "Ada" Okonkwo | 36 | Nigeria | TV detective in *Inspector Ada* | Closes her notebook |
+| 2 | Rafael "Rafa" Duarte | 28 | Brazil | Superstar striker | Swears "on my mother" more |
+| 3 | Han Min-seo | 24 | South Korea | K-pop group center | Shorter, extra-polite answers |
+| 4 | Dame Celia Hartwell | 68 | UK | Legendary Shakespearean actress | Quotes Shakespeare when cornered |
+| 5 | Marcus Vale | 45 | USA | Late-night talk show host | Answers a question with a question |
+| 6 | Marisol Ibarra | 49 | Mexico | Beloved TV chef | Cooks a special dish for her next victim |
+| 7 | Kenji Moriyama | 41 | Japan | Las Vegas illusionist | Rolls a coin across his knuckles |
+| 8 | Tomas Lindqvist | 52 | Sweden | Chess grandmaster turned poker champion | His percentages leave himself out |
+| 9 | Zara Haddad | 30 | Lebanon / Paris | Supermodel turned designer | Never shades fellow Oathbreakers |
+| 10 | Kwame Mensah | 38 | Ghana / London | Arena-tour stand-up comedian | The jokes stop |
+| 11 | Tayla Brooks | 26 | Australia | Olympic swimming champion | Her mission scores drop |
+
+Relationship web: Rafa and Zara (tabloid exes), Celia and Marcus (on-air feud), Kenji and Tomas (rival people-readers), Min-seo and Tayla (fast friends), Kwame and Marcus (former writer and boss).
+
+**Player identity:** the player picks a face (6 avatars: 3 women, 3 men, varied ages and ethnicities, styled as celebrities) and what they are famous for. That choice sets first impressions: cast members in the same field start as mild rivals, and one or two random cast members start as fans (small trust bonus). It changes dialogue and starting suspicion only, with no gameplay perks.
 
 ### AI behavior
 
@@ -121,7 +125,7 @@ Locked style prompt for all images: "Cinematic photoreal, moody candlelit Scotti
 
 - **Palette:** candle amber `#E8A33D`, blood crimson `#8E1B1B`, castle stone `#2B2F36`, midnight `#0E1117`, parchment `#EFE3C8`.
 - **Typography:** Cinzel (titles), Cormorant Garamond (body), both from Google Fonts.
-- **Characters:** photoreal waist-up portraits in 3:4, in tweed, knitwear and dark coats, lit by candlelight. Each has 4 expressions (neutral, suspicious, shocked, smug) made from one hero portrait with character consistency.
+- **Characters:** photoreal waist-up portraits in 3:4, each in their signature celebrity look from `CAST.md`, lit by candlelight inside the castle. Each has 4 expressions (neutral, suspicious, shocked, smug) made from one hero portrait with character consistency.
 - **Murdered state:** the portrait desaturates in code, with a candle-smoke overlay and a red wax X.
 - **UI:** parchment cards with wax seals, iron-framed panels, and a soft vignette. Votes are written on parchment and slapped face-down onto the oak table.
 
@@ -153,6 +157,7 @@ Locked style prompt for all images: "Cinematic photoreal, moody candlelit Scotti
 - Subtitle: `TRUST NO ONE AT RAVENHOLT`
 - Name input placeholder: `Your name, contestant` (2-16 characters)
 - Avatar picker label: `CHOOSE YOUR FACE`
+- Fame picker: `FAMOUS FOR:` with `ACTOR` / `MUSICIAN` / `ATHLETE` / `INFLUENCER` / `CHEF` / `COMEDIAN`
 - Role selector: `YOUR FATE:` with `RANDOM` (default) / `SWORN` / `OATHBREAKER`
 - Buttons: `ENTER THE CASTLE`, `CONTINUE SEASON` (only if a save exists), `HOW TO PLAY`, `MEET THE CAST`
 - Rotating flavor line: `Someone at this table is lying.` / `The candles never lie. People do.` / `Gold for the loyal. Everything for the traitor.` / `Smile at breakfast. Vote at dinner.`
