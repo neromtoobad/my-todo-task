@@ -344,7 +344,7 @@ function peek(on) {
   if (on && view && view.you) {
     b.textContent = view.you.role === "O" ? "OATHBREAKER" : "SWORN";
     b.classList.add(view.you.role);
-  } else b.textContent = "HOLD R TO PEEK";
+  } else b.textContent = matchMedia("(max-width: 640px)").matches ? "HOLD: ROLE" : "HOLD R TO PEEK";
 }
 
 function renderScene() {
@@ -371,7 +371,7 @@ function peopleGrid(ids, opts = {}) {
     const card = el("button", {
       class: `person${opts.selected === id ? " sel" : ""}${r && !r.alive ? " dead" : ""}`, type: "button",
       onclick: () => opts.onPick && opts.onPick(id, card),
-    }, el("img", { src: portrait(id, opts.emo && opts.emo[id]), alt: "" }), el("span", { class: "nm", text: nameOf(id).toUpperCase() }));
+    }, el("img", { src: portrait(id, opts.emo && opts.emo[id]), alt: "", onerror: (e) => { e.target.style.visibility = "hidden"; } }), el("span", { class: "nm", text: nameOf(id).toUpperCase() }));
     const role = r && r.role && !r.human ? r.role : null;
     if (role && opts.showRoles !== false) card.append(el("span", { class: `tag ${role}`, text: role === "O" ? "OATHBREAKER" : "SWORN" }));
     if (opts.votes && opts.votes[id]) card.append(el("span", { class: "votes", text: `×${opts.votes[id]}` }));

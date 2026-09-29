@@ -181,16 +181,39 @@ function reasonFor(s, t, r) {
   const nm = nameOf(s, t);
   if (tags.length && r.chance(0.75)) {
     const tag = tags[tags.length - 1 - r.int(Math.min(2, tags.length))];
+    const pick = (...opts) => r.pick(opts);
     switch (tag.k) {
-      case "slip": return `${nm} fumbled rune ${tag.n} in the vault. Nobody fumbles by accident.`;
-      case "light": return `${nm} was on the ${tag.path} path, and that chest came back light.`;
-      case "lantern": return `${nm} lit only ${tag.n} lanterns. I've seen them do better in their sleep.`;
-      case "wrongvote": return `${nm} voted out ${tag.who}, and ${tag.who} was Sworn.`;
-      case "defended": return `${nm} defended ${tag.who} right up until ${tag.who} was unmasked.`;
-      case "shieldbuy": return `Someone bought a shield with our gold. My money's on ${nm}.`;
-      case "glimpse": return `${nm} was named in the Glimpse. The mirror doesn't lie.`;
-      case "accusedvictim": return `${tag.who} was pointing at ${nm} yesterday. Now ${tag.who} is dead.`;
-      case "dish": return `Funny how ${nm} knew exactly who wouldn't need breakfast.`;
+      case "slip": return pick(
+        `${nm} fumbled rune ${tag.n} in the vault. Nobody fumbles by accident.`,
+        `Rune ${tag.n}. ${nm} knew that sequence cold and still missed it.`,
+        `The vault was easy money until ${nm} slipped. Convenient.`);
+      case "light": return pick(
+        `${nm} was on the ${tag.path} path, and that chest came back light.`,
+        `Seven hundred gold vanished on the ${tag.path} path. ${nm} walked that path.`,
+        `Ask ${nm} where the ${tag.path} chest's gold went.`);
+      case "lantern": return pick(
+        `${nm} lit only ${tag.n} lanterns. I've seen them do better in their sleep.`,
+        `${tag.n} lanterns? From ${nm}? That was a performance, not a mistake.`,
+        `${nm} let the lanterns go dark on purpose. I'm sure of it.`);
+      case "wrongvote": return pick(
+        `${nm} voted out ${tag.who}, and ${tag.who} was Sworn.`,
+        `${nm} pushed hard for ${tag.who}. ${tag.who} was one of us.`,
+        `Remember who helped send ${tag.who} home? ${nm} did.`);
+      case "defended": return pick(
+        `${nm} defended ${tag.who} right up until ${tag.who} was unmasked.`,
+        `${nm} stood up for an Oathbreaker. Why would a Sworn do that?`);
+      case "shieldbuy": return pick(
+        `Someone bought a shield with our gold. My money's on ${nm}.`,
+        `Fifteen hundred gold for a shield. ${nm} has been very relaxed at night.`);
+      case "glimpse": return pick(
+        `${nm} was named in the Glimpse. The mirror doesn't lie.`,
+        `The mirror showed us ${nm}'s face. I'm not ignoring that.`);
+      case "accusedvictim": return pick(
+        `${tag.who} was pointing at ${nm} yesterday. Now ${tag.who} is dead.`,
+        `${tag.who} named ${nm}, and ${tag.who} didn't make it to breakfast.`);
+      case "dish": return pick(
+        `Funny how ${nm} knew exactly who wouldn't need breakfast.`,
+        `${nm} baked for the victim the day before. Think about that.`);
       default: break;
     }
   }
@@ -201,6 +224,8 @@ function reasonFor(s, t, r) {
     `${nm} watches everyone and says nothing.`,
     `${nm} has been working the room a bit too hard.`,
     `Every time something goes wrong, ${nm} is nearby.`,
+    `${nm} agrees with whoever spoke last. That's a strategy.`,
+    `${nm} hasn't accused anyone. Not once. Why?`,
   ]);
 }
 
@@ -765,6 +790,7 @@ function eavesdrop(s, r) {
 function startRoundTable(s, r) {
   s.phase = "RT";
   s.acc = {};
+  s.rtTurned = false;
   const lines = [];
   if (s.final) lines.push(laird("Then back to the table. One more of you leaves... and nobody will know who they were.", ""));
   else lines.push(laird("Welcome to the Round Table. Somebody here is not who they say they are.", "l_roundtable"));
@@ -779,7 +805,8 @@ function startRoundTable(s, r) {
     s.lastAcc[a] = t;
     for (const b of aiAlive(s)) if (b.id !== a && b.id !== t) sus(s, b.id, t, 0.6 * BY_ID[a].loud * (1 - (s.sus[b.id][a] || 0) / 100));
     if (t === HUMAN) {
-      lines.push(narr("Every head turns toward you."));
+      if (!s.rtTurned) lines.push(narr("Every head turns toward you."));
+      s.rtTurned = true;
     } else if (r.chance(0.7)) {
       const tl = P(s, t).role === "O";
       const def = r.pick([
