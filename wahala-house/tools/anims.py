@@ -9,7 +9,8 @@ tiny skeleton from the rest pose and retargets the clip onto each character.
 """
 import json, struct, sys
 
-FPS = 24
+FPS = 20
+MAXDUR = 8.0
 
 def read_glb(path):
     d = open(path, "rb").read()
@@ -101,6 +102,7 @@ def main():
             vals = acc(j, b, s["output"])
             dur = max(dur, times[-1])
             tracks[(names[node], path_)] = (times, vals)
+        dur = min(dur, MAXDUR)
         n = max(2, int(round(dur * FPS)) + 1)
         out_tracks = []
         # Root scale bug: some library clips bake a scale into Hips. Fold it out.
