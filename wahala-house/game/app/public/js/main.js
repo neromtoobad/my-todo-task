@@ -500,6 +500,9 @@ function arrange(st, v, ev) {
   camStage = new THREE.Vector3(c[0], 0.9, c[1]);
   zoomTarget = z;
   camFocusVec = null;
+  // This runs under the fade, so cut straight to the new set.
+  world.follow(camStage, true);
+  world.setZoom(z);
   world.partyMode = ev && ev.k === "party";
   for (const id of AI_IDS) { const a = actors[id]; a.scene = null; a.tkey = null; a.leaving = false; a.oneShot = null; }
   const inHouse = v.hm.filter((h) => !h.out).map((h) => h.id);

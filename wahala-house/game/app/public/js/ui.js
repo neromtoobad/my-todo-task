@@ -165,7 +165,7 @@ export class UI {
     if (fd) this.fanArrow = fd > 0 ? "▲" : "▼";
     this.prevFans = y.fans;
     $("#hFans").innerHTML = `<small>FANS</small>${y.fans} <b class="${this.fanArrow === "▼" ? "dn" : "up"}">${this.fanArrow || ""}</b>`;
-    $("#hStrikes").innerHTML = `<small>STRIKES</small>${"⛔".repeat(y.strikes)}${"<i class=o>○</i>".repeat(Math.max(0, 3 - y.strikes))}`;
+    $("#hStrikes").innerHTML = `<small>STRIKES</small><span class="strk">${"⛔".repeat(y.strikes)}${"<i class=o>○</i>".repeat(Math.max(0, 3 - y.strikes))}</span>`;
     const badges = [];
     if (y.hoh) badges.push(["HEAD OF HOUSE", "gold"]);
     if (y.tenant) badges.push(["TENANT", "gold"]);

@@ -400,7 +400,7 @@ export class World {
     this.box(0.2, 3.4, 7, this.mat(0x1f0f1c), 58, 1.7, 2.5);
     const eye = new THREE.Mesh(new THREE.CircleGeometry(1.1, 40), new THREE.MeshStandardMaterial({ map: tex("assets/img/eye.jpg"), emissive: 0xffffff, emissiveMap: tex("assets/img/eye.jpg"), emissiveIntensity: 1.2 }));
     eye.position.set(61.5, 2.4, -0.88); this.scene.add(eye);
-    const dl = new THREE.PointLight(0xff3050, 16, 10, 1.5); dl.position.set(61.5, 3, 2.5); dl.visible = false; this.scene.add(dl);
+    const dl = new THREE.PointLight(0xff3050, 60, 14, 1.2); dl.position.set(61.5, 3, 2.5); dl.visible = false; this.scene.add(dl);
     // Red Room at x 78..85.
     this.floor(78, -1, 85, 6, this.mat(0x200608), 0.02);
     this.box(7, 3.4, 0.2, this.mat(0x2a080c), 81.5, 1.7, -1);
@@ -408,7 +408,7 @@ export class World {
     const reye = new THREE.Mesh(new THREE.CircleGeometry(1.2, 40), new THREE.MeshStandardMaterial({ color: 0xff3030, map: tex("assets/img/eye.jpg"), emissive: 0xff2020, emissiveMap: tex("assets/img/eye.jpg"), emissiveIntensity: 1.4 }));
     reye.position.set(81.5, 2.3, -0.88); this.scene.add(reye);
     this.box(1.8, 0.8, 1.1, this.mat(0x3a1a12, { roughness: 0.6 }), 81.5, 0.4, 1.4, 0.05);
-    const rl = new THREE.PointLight(0xff1a2a, 22, 12, 1.4); rl.position.set(81.5, 3, 3); rl.visible = false; this.scene.add(rl);
+    const rl = new THREE.PointLight(0xff1a2a, 80, 14, 1.2); rl.position.set(81.5, 3, 3); rl.visible = false; this.scene.add(rl);
     // Only lit while the camera is on that set (every light costs every pixel).
     this.setLights = { diary: dl, redroom: rl };
   }
