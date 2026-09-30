@@ -156,9 +156,11 @@ Dialogue voice: English with Nigerian flavor and light Pidgin ("Omo!", "Abeg", "
 
 ## ART DIRECTION (locked style formula)
 
-"Bold vibrant 2D cartoon game art in isometric three-quarter view, clean thick dark-brown outlines, cel shading with soft gradients, chunky stylized proportions with slightly oversized heads and expressive faces; house and environment in warm cream, terracotta and gold with Ankara-pattern accents, characters in saturated jewel tones of emerald, magenta, cobalt and sunflower that pop from the backgrounds, drama and danger accents in hot red and electric purple; lively sunny Lagos luxury by day and neon party glow by night; high contrast, clean readable silhouettes, consistent isometric three-quarter view across all assets"
+Chosen from a 4-way style test (3D movie, anime, semi-realistic painted, pixel art): **3D animated movie look**, rendered into 2D sprites.
 
-- **Characters**: full Nigerian fashion range (Ankara prints, agbada, gele, kaftan, bold streetwear, braids, locs, fades, bantu knots, gold jewelry).
+"Stylized 3D animated feature-film look in isometric three-quarter view, appealing rounded character designs with slightly oversized heads and big expressive eyes, soft global illumination, subsurface skin shading on rich deep-brown Nigerian skin tones, glossy fabrics and materials with detailed Ankara, aso-oke and lace textures; house and environment in warm cream, terracotta and gold, characters in saturated jewel tones of emerald, magenta, cobalt and sunflower, drama accents in hot red and electric purple; sunny Lagos luxury by day and neon party glow by night; warm cinematic color grade, clean readable silhouettes, like a frame from a premium 3D animated movie"
+
+- **Characters**: full Nigerian fashion range (Ankara prints, agbada, gele, kaftan, bold streetwear, braids, locs, fades, bantu knots, gold jewelry). Looks locked from the approved cast lineup images, which are used as references for every sprite, portrait and animation.
 - **Day and night**: the whole house re-tints by time of day (warm morning, bright afternoon, golden evening, purple neon night).
 - **UI**: Afro-pop glam: rounded panels, Ankara-pattern borders, gold accents, big expressive portraits for dialogue.
 
