@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Wahala House</title>
+    <meta name="description" content="A 3D Nigerian reality show where you live in the house. Make friends, fall in love, start beef, win Head of House, and find the two Saboteurs draining the prize pot before they strike you out." />
+    <meta property="og:title" content="Wahala House" />
+    <meta property="og:description" content="A 3D Nigerian reality show where you live in the house. Make friends, fall in love, start beef, and find the Saboteurs before they strike you out." />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="theme-color" content="#1b1026" />
+    <link rel="icon" type="image/png" href="/assets/img/favicon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/style.css" />
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "/vendor/three/build/three.module.min.js",
+          "three/addons/": "/vendor/three/examples/jsm/"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <canvas id="c" aria-label="The Wahala House"></canvas>
+    <div id="tags" aria-hidden="true"></div>
+    <div id="ui"></div>
+    <div id="fade"></div>
+    <noscript><p class="fatal">Wahala House needs JavaScript to run.</p></noscript>
+    <script type="module" src="/js/main.js"></script>
+  </body>
+</html>
