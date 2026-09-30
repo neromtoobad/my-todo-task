@@ -72,7 +72,6 @@ def main():
             k = stack.pop(); keep.add(k); stack.extend(nodes[k].get("children", []))
         p = parent.get(hips)
         while p is not None: keep.add(p); p = parent.get(p)
-        order = sorted(keep, key=lambda i: (0 if i not in parent else 1 + len([1 for _ in iter(lambda: None, 1)][:0])))
         # parents before children
         def depth(i):
             d = 0
