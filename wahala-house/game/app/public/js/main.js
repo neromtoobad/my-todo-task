@@ -456,7 +456,7 @@ function openShop() {
 
 // ------------------------------------------------------------------ events
 let evKey = null, handledItem = null, stage = null, entryCount = 0;
-const STAGE_CAM = { arena: [[28.4, 12.8], 6.6], lounge: [[16.8, 4.6], 6.2], kitchen: [[5.6, 6.8], 6.4], diary: [[61.5, 1.9], 3.3], redroom: [[81.4, 2.3], 3.6] };
+const STAGE_CAM = { arena: [[28.4, 13.2], 5.4], lounge: [[16.8, 4.8], 5.2], kitchen: [[5.6, 7.2], 5.4], diary: [[61.5, 1.9], 3.0], redroom: [[81.4, 2.3], 3.3] };
 
 function processEv(v) {
   const ev = v.ev;
@@ -575,7 +575,7 @@ async function playBeat(v, ev, b) {
   const camOn = (focusA && focusA.visible && focusA) || (b.enter ? null : speaker && speaker.visible ? speaker : null);
   camFocusVec = camOn ? camOn : null;
   if (b.enter) camFocusVec = null;
-  zoomTarget = camOn ? (stage === "diary" || stage === "redroom" ? 3.0 : 4.6) : (STAGE_CAM[stage] || STAGE_CAM.lounge)[1];
+  zoomTarget = camOn ? (stage === "diary" || stage === "redroom" ? 2.8 : 3.8) : (STAGE_CAM[stage] || STAGE_CAM.lounge)[1];
   // Moves.
   let targets = [];
   if (b.pair) targets = b.pair;
@@ -629,7 +629,7 @@ function enterActor(id) {
   a.walkTo(world, m.p[0], m.p[1], m.r, () => a.gesture("wave", 2.5));
   a.play("strut");
   camFocusVec = a;
-  zoomTarget = 4.8;
+  zoomTarget = 4;
 }
 
 function leaveHouse(id) {
@@ -765,7 +765,7 @@ function updateTags() {
 
 // ------------------------------------------------------------------ camera
 let camMode = "lobby", camStage = new THREE.Vector3(16, 0.9, 8), camFocusVec = null;
-let baseZoom = 7.5, zoomTarget = 7.5;
+let baseZoom = 6, zoomTarget = 6;
 const camV = new THREE.Vector3();
 function camFocus(a) { return camV.set(a.pos.x, 0.9 + (a.yOff || 0), a.pos.z); }
 let lobbyT = 0;
