@@ -1,0 +1,43 @@
+<!doctype html><html><body style="margin:0">
+<script type="importmap">{"imports":{"three":"/node_modules/three/build/three.module.js","three/addons/":"/node_modules/three/examples/jsm/"}}</script>
+<script type="module">
+// Test renderer for rigged GLB characters, seen from the game's isometric camera.
+// Query: f=glb path, w/h=px, z=ortho half-height, cy=look-at height, n=count, clip=index
+import * as THREE from "three";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { clone } from "three/addons/utils/SkeletonUtils.js";
+const q = new URLSearchParams(location.search);
+const W = +q.get("w"), H = +q.get("h"), Z = +q.get("z"), N = +(q.get("n") || 1), CY = +(q.get("cy") || 0.85);
+const r = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+r.setSize(W, H); r.outputColorSpace = THREE.SRGBColorSpace; r.toneMapping = THREE.ACESFilmicToneMapping;
+r.shadowMap.enabled = true; r.shadowMap.type = THREE.PCFSoftShadowMap;
+document.body.appendChild(r.domElement);
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0xf3e6cf);
+scene.add(new THREE.HemisphereLight(0xfff4e0, 0x8a6a50, 1.5));
+const sun = new THREE.DirectionalLight(0xffe2b8, 2.4); sun.position.set(4, 8, 3); sun.castShadow = true; sun.shadow.mapSize.set(1024, 1024); scene.add(sun);
+const fill = new THREE.DirectionalLight(0xb8d0ff, 0.7); fill.position.set(-5, 3, -2); scene.add(fill);
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(40, 40), new THREE.MeshStandardMaterial({ color: 0xe9d3b0 }));
+ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; scene.add(ground);
+const cam = new THREE.OrthographicCamera(-W / H * Z, W / H * Z, Z, -Z, 0.1, 100);
+const el = Math.atan(1 / Math.sqrt(2)), d = 20;
+cam.position.set(d * Math.cos(el) * Math.sin(Math.PI / 4), d * Math.sin(el) + CY, d * Math.cos(el) * Math.cos(Math.PI / 4)); cam.lookAt(0, CY, 0);
+const files = q.get("f").split(",");
+const clipIdx = +(q.get("clip") || 0);
+const dirs = [Math.PI / 4, -Math.PI / 4, Math.PI * 3 / 4, -Math.PI * 3 / 4, 0];
+let k = 0;
+for (const f of files) {
+  const g = await new GLTFLoader().loadAsync(f);
+  g.scene.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+  const clip = g.animations[Math.min(clipIdx, g.animations.length - 1)];
+  const per = files.length > 1 ? 1 : N;
+  for (let i = 0; i < per; i++, k++) {
+    const c = clone(g.scene);
+    const total = files.length > 1 ? files.length : N;
+    c.position.copy(new THREE.Vector3((k - (total - 1) / 2) * 1.05, 0, 0).applyAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 4));
+    c.rotation.y = dirs[i % 5];
+    scene.add(c);
+    if (clip) { const m = new THREE.AnimationMixer(c); m.clipAction(clip).play(); m.setTime(clip.duration * (0.1 + i / 5)); }
+  }
+}
+r.render(scene, cam); window.done = true;
+</script></body></html>
