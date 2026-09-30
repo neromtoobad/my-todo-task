@@ -1,0 +1,35 @@
+<!doctype html><html><body>
+<script type="importmap">{"imports":{"three":"/node_modules/three/build/three.module.js","three/addons/":"/node_modules/three/examples/jsm/"}}</script>
+<script type="module">
+// Numeric check of retargetClip: retarget a clip from character A onto B and
+// compare with B's own copy of the same mocap clip (made by the rigging service).
+import * as THREE from "three";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { clone } from "three/addons/utils/SkeletonUtils.js";
+import { retargetClip } from "/tools/retarget.js";
+const L = new GLTFLoader();
+const pairs = JSON.parse(decodeURIComponent(new URLSearchParams(location.search).get("p")));
+const out = [];
+function worldQ(root) { const m = {}; root.updateMatrixWorld(true); root.traverse((o) => { if (o.isBone) m[o.name] = o.getWorldQuaternion(new THREE.Quaternion()); }); return m; }
+for (const [a, b] of pairs) {
+  const A = await L.loadAsync(`/${a}.glb`), B = await L.loadAsync(`/${b}.glb`);
+  const t0 = performance.now();
+  const rc = retargetClip(A.scene, A.animations[0], B.scene, { fps: 30 });
+  const ms = performance.now() - t0;
+  const n1 = clone(B.scene), n2 = clone(B.scene);
+  const m1 = new THREE.AnimationMixer(n1), m2 = new THREE.AnimationMixer(n2);
+  m1.clipAction(B.animations[0]).play(); m2.clipAction(rc).play();
+  let sum = 0, cnt = 0, worst = 0, worstB = "";
+  const per = {};
+  for (let i = 0; i < 20; i++) {
+    const t = (i / 20) * Math.min(B.animations[0].duration, rc.duration);
+    m1.setTime(t); m2.setTime(t);
+    const q1 = worldQ(n1), q2 = worldQ(n2);
+    for (const k of Object.keys(q1)) { if (!q2[k]) continue; const ang = q1[k].angleTo(q2[k]) * 180 / Math.PI; sum += ang; cnt++; per[k] = (per[k] || 0) + ang / 20; if (ang > worst) { worst = ang; worstB = k; } }
+  }
+  const nan = rc.tracks.some((tr) => Array.from(tr.values).some((x) => !isFinite(x)));
+  out.push({ a, b, clipA: A.animations[0].name, clipB: B.animations[0].name, meanDeg: +(sum / cnt).toFixed(1), worstDeg: +worst.toFixed(1), worstBone: worstB, nan, ms: Math.round(ms),
+    top: Object.entries(per).sort((x, y) => y[1] - x[1]).slice(0, 4).map(([k, v]) => k + ":" + v.toFixed(0)).join(" ") });
+}
+window.result = out;
+</script></body></html>

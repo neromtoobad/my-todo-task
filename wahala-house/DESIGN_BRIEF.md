@@ -156,7 +156,7 @@ Dialogue voice: English with Nigerian flavor and light Pidgin ("Omo!", "Abeg", "
 
 ## ART DIRECTION (locked style formula)
 
-Chosen from a 4-way style test (3D movie, anime, semi-realistic painted, pixel art): **3D animated movie look**, rendered into 2D sprites.
+Chosen from a 4-way style test (3D movie, anime, semi-realistic painted, pixel art): **3D animated movie look**. Every housemate is a detailed rigged 3D model (image to 3D, auto-rig, motion-capture clips), and the house is rendered live in 3D from a fixed isometric camera with real lighting, shadows and a day to night cycle.
 
 "Stylized 3D animated feature-film look in isometric three-quarter view, appealing rounded character designs with slightly oversized heads and big expressive eyes, soft global illumination, subsurface skin shading on rich deep-brown Nigerian skin tones, glossy fabrics and materials with detailed Ankara, aso-oke and lace textures; house and environment in warm cream, terracotta and gold, characters in saturated jewel tones of emerald, magenta, cobalt and sunflower, drama accents in hot red and electric purple; sunny Lagos luxury by day and neon party glow by night; warm cinematic color grade, clean readable silhouettes, like a frame from a premium 3D animated movie"
 
