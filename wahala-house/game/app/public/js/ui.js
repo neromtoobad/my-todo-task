@@ -404,6 +404,7 @@ export class UI {
 
   // ------------------------------------------------------------------ banners & end
   banner(title, sub) {
+    for (const old of this.root.querySelectorAll(".banner")) old.remove();
     const b = el("div", { class: "banner" }, el("h2", { text: title }), sub ? el("p", { text: sub }) : null);
     this.root.append(b);
     audio.sfx("s_whoosh", 0.5);

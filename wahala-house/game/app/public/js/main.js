@@ -54,6 +54,11 @@ const app = {
   openShop() { openShop(); },
 };
 window.__wh = app; // handy for QA in the console
+/** A snapshot of every body on screen, for QA scripts and the console. */
+app.debug = () => ({
+  ready, lib: !!lib, quality: typeof qLevel === "number" ? qLevel : 0, stage,
+  actors: Object.fromEntries(Object.entries(actors).map(([k, a]) => [k, { fallback: !!a.fallback, ready: a.ready, anim: a.anim, clips: Object.keys(a.clips).length, visible: a.visible, pos: [+a.pos.x.toFixed(2), +a.pos.z.toFixed(2)], y: +(a.yOff || 0).toFixed(2) }])),
+});
 function act(a) { app.busy = true; app.busyAt = performance.now(); send({ type: "action", action: a }); }
 
 let world, ui, lib = null;
@@ -661,6 +666,7 @@ let danceI = 1;
 async function runMini(v, m) {
   app.gameOn = true;
   app.gameKind = m.g;
+  document.body.classList.add("gaming");
   keys.clear();
   // The dancers in the arena follow the player's rhythm.
   const ctx = {
@@ -681,6 +687,7 @@ async function runMini(v, m) {
   try { score = await playGame(m, ctx); }
   catch (e) { console.error(e); score = m.g === "hustle" ? { profit: 0, skim: 0 } : 0; }
   app.gameOn = false;
+  document.body.classList.remove("gaming");
   camFocusVec = null;
   zoomTarget = (STAGE_CAM[stage] || STAGE_CAM.lounge)[1];
   audio.playMusic(musicFor(app.view));
