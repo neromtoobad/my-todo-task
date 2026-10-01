@@ -188,6 +188,15 @@ export class UI {
     for (const n of v.notes || []) if (n.id > this.lastNote) { this.lastNote = n.id; this.toast(n.t, n.k); }
   }
 
+  /** The one-line tip under the HUD; empty text hides it. */
+  hint(text) {
+    let h = $("#hint");
+    if (!h) { h = el("div", { id: "hint" }, el("span", { class: "hi", text: "TIP" }), el("span", { class: "ht" })); this.root.append(h); }
+    const t = h.querySelector(".ht");
+    if (t.textContent !== text) t.textContent = text || "";
+    h.hidden = !text;
+  }
+
   toast(text, kind = "info") {
     const box = $("#toasts"); if (!box) return;
     const t = el("div", { class: "toast " + kind, text });
@@ -218,14 +227,22 @@ export class UI {
   }
 
   // ------------------------------------------------------------------ dialogue
-  /** Show one line. Resolves when the player advances. */
+  /**
+   * Show one line. Resolves when the player advances ("next"), when the line's
+   * auto timer runs out ("next"), or when the player skips the scene ("skip").
+   * opts.auto: ms to hold the finished line before moving on by itself.
+   * opts.skippable: show the SKIP button (show events only).
+   */
   line(who, text, opts = {}) {
     return new Promise((resolve) => {
       let d = $("#dialog");
       if (!d) {
-        d = el("div", { id: "dialog" }, el("div", { class: "dp" }, el("img", { alt: "" })), el("div", { class: "db" }, el("div", { class: "dn" }), el("div", { class: "dt" }), el("div", { class: "dfx" }), el("div", { class: "dh", text: "Click or press SPACE" })));
+        d = el("div", { id: "dialog" }, el("div", { class: "dp" }, el("img", { alt: "" })), el("div", { class: "db" }, el("div", { class: "dn" }), el("div", { class: "dt" }), el("div", { class: "dfx" }), el("div", { class: "dh", text: "Click or press SPACE" }),
+          el("button", { class: "dskip", type: "button", title: "Skip to the next big moment (ESC)" }, "SKIP ▸▸")));
         this.root.append(d);
       }
+      const skipBtn = d.querySelector(".dskip");
+      skipBtn.hidden = !opts.skippable;
       const sp = SPEAKERS[who];
       const img = d.querySelector(".dp img");
       const src = sp ? sp.img : this.pic(who, opts.mood || "neutral");
@@ -243,18 +260,31 @@ export class UI {
       t.textContent = "";
       if (sub) t.after(sub);
       d.hidden = false;
-      let i = 0, done = false;
+      let i = 0, done = false, over = false, autoT = 0;
       const full = String(text || "");
       const speed = full.length > 140 ? 9 : 16;
       clearInterval(this.typing);
-      this.typing = setInterval(() => { i += 2; t.textContent = full.slice(0, i); if (i >= full.length) { clearInterval(this.typing); done = true; } }, speed);
-      const advance = () => {
-        if (!done) { clearInterval(this.typing); t.textContent = full; done = true; return; }
-        cleanup(); if (sub) sub.remove(); resolve();
+      const armAuto = () => { if (opts.auto) autoT = setTimeout(() => finish("next"), opts.auto); };
+      this.typing = setInterval(() => { i += 2; t.textContent = full.slice(0, i); if (i >= full.length) { clearInterval(this.typing); done = true; armAuto(); } }, speed);
+      const finish = (how) => {
+        if (over) return;
+        over = true;
+        clearTimeout(autoT); clearInterval(this.typing);
+        cleanup(); if (sub) sub.remove(); resolve(how);
       };
-      const onKey = (e) => { if (e.code === "Space" || e.key === "Enter") { e.preventDefault(); advance(); } };
-      const cleanup = () => { d.removeEventListener("click", advance); window.removeEventListener("keydown", onKey, true); };
+      const advance = (e) => {
+        if (e && e.target && e.target.closest && e.target.closest(".dskip")) return;
+        if (!done) { clearInterval(this.typing); t.textContent = full; done = true; armAuto(); return; }
+        finish("next");
+      };
+      const skip = (e) => { if (e) e.stopPropagation(); finish("skip"); };
+      const onKey = (e) => {
+        if (e.code === "Space" || e.key === "Enter") { e.preventDefault(); advance(); }
+        else if (e.key === "Escape" && opts.skippable) { e.preventDefault(); skip(); }
+      };
+      const cleanup = () => { d.removeEventListener("click", advance); skipBtn.removeEventListener("click", skip); window.removeEventListener("keydown", onKey, true); };
       d.addEventListener("click", advance);
+      skipBtn.addEventListener("click", skip);
       window.addEventListener("keydown", onKey, true);
       this.app.dialogOpen = true;
     });
@@ -403,9 +433,9 @@ export class UI {
   }
 
   // ------------------------------------------------------------------ banners & end
-  banner(title, sub) {
+  banner(title, sub, size) {
     for (const old of this.root.querySelectorAll(".banner")) old.remove();
-    const b = el("div", { class: "banner" }, el("h2", { text: title }), sub ? el("p", { text: sub }) : null);
+    const b = el("div", { class: "banner" + (size ? " " + size : "") }, el("h2", { text: title }), sub ? el("p", { text: sub }) : null);
     this.root.append(b);
     audio.sfx("s_whoosh", 0.5);
     setTimeout(() => b.classList.add("out"), 2600);

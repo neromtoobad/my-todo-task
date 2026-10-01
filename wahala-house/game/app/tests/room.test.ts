@@ -183,6 +183,39 @@ describe("a season", () => {
     a.ws.close();
   }, 120_000);
 
+  it("skips talk but always stops on the role reveal", async () => {
+    const { a, st } = await season("skip", "saboteur");
+    let v = st.view;
+    let sawReveal = false;
+    for (let guard = 0; v.phase === "EV" && guard < 40; guard++) {
+      const it = v.ev.item;
+      if (it.b && it.b.reveal) sawReveal = true;
+      const reply = await step(a, it.b ? { t: "skip" } : it.c ? { t: "pick", v: it.c.o[0].v } : { t: "score", v: 1000 });
+      expect(reply.type).toBe("state");
+      v = reply.view;
+    }
+    expect(sawReveal).toBe(true);
+    expect(v.phase).toBe("ROAM");
+    a.ws.close();
+  });
+
+  it("offers free activities only in the right room", async () => {
+    const { a, st } = await season("doings");
+    let v = st.view;
+    for (let guard = 0; v.phase === "EV" && guard < 40; guard++) {
+      const it = v.ev.item;
+      v = (await step(a, it.b ? { t: "skip" } : it.c ? { t: "pick", v: it.c.o[0].v } : { t: "score", v: 1000 })).view;
+    }
+    expect(v.phase).toBe("ROAM");
+    expect(v.you.room).toBe("lounge");
+    expect((await step(a, { t: "do", what: "cook" })).error).toBe("You can't do that in here.");
+    expect((await step(a, { t: "do", what: "fly" })).error).toBe("bad activity");
+    const done = await step(a, { t: "do", what: "chores" });
+    expect(done.type).toBe("state");
+    expect(done.view.you.coins).toBe(240);
+    a.ws.close();
+  });
+
   it("returns to the lobby on reset", async () => {
     const { a } = await season("reset");
     a.frames.length = 0;

@@ -176,16 +176,48 @@ export class Actor {
   }
 
   headWorld(out) { return out.set(this.pos.x, (this.yOff || 0) + 2.05, this.pos.z); }
+
+  /** Height of the hips above this body's feet line at the first frame of a move. */
+  hipsRest(key) {
+    this._hips = this._hips || {};
+    if (key in this._hips) return this._hips[key];
+    let y = null;
+    const c = this.clip(key);
+    const bone = this.model && this.model.getObjectByName("Hips");
+    const tr = c && c.tracks.find((t) => t.name.endsWith("Hips.position"));
+    if (bone && bone.parent && tr) {
+      this.root.updateMatrixWorld(true);
+      const v = new THREE.Vector3(tr.values[0], tr.values[1], tr.values[2]);
+      bone.parent.localToWorld(v);
+      y = v.y - this.root.position.y;
+    }
+    this._hips[key] = y;
+    return y;
+  }
+
+  /** Vertical offset that sets this body's hips on a surface (seat, bed, lounger). */
+  restY(key, surface) {
+    if (surface === null || surface === undefined) return 0;
+    const lying = key === "sleep" || key === "sunbathe";
+    const h = this.hipsRest(key);
+    if (h === null) return lying ? surface : 0;
+    return surface + (lying ? 0.11 : 0.09) - h;
+  }
 }
 
-/** Resting move and height offset for a spot pose and a server activity. */
-export function restFor(pose, act) {
-  if (act === "sleep") return pose === "bed" ? ["sleep", 0.62] : ["sit", 0];
-  if (act === "sunbathe") return pose === "lounger" ? ["sunbathe", 0.38] : ["idle", 0];
-  if (act === "workout") return ["workout", 0];
-  if (act === "sit" || act === "rest" || act === "phone" || act === "eat") return pose === "sit" || pose === "bed" || pose === "lounger" ? ["sit", pose === "bed" ? 0.1 : 0] : ["idle", 0];
-  if (act === "cook") return ["talk2", 0];
-  return ["idle", 0];
+/**
+ * Resting move for a spot and a server activity, plus the surface the body rests
+ * on (null when standing). Actor.restY turns the surface into a height offset.
+ */
+export function restFor(spot, act) {
+  const pose = spot ? spot.pose : "stand";
+  const seat = spot && spot.seat !== undefined ? spot.seat : null;
+  if (act === "sleep") return pose === "bed" ? ["sleep", seat + 0.02] : seat !== null ? ["sit", seat] : ["idle", null];
+  if (act === "sunbathe") return pose === "lounger" ? ["sunbathe", seat] : ["idle", null];
+  if (act === "workout") return ["workout", null];
+  if (act === "sit" || act === "rest" || act === "phone" || act === "eat") return seat !== null ? ["sit", seat] : ["idle", null];
+  if (act === "cook") return ["talk2", null];
+  return ["idle", null];
 }
 
 /** Moves used when a scene is running between two housemates. */

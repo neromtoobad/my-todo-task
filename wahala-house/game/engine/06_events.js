@@ -11,7 +11,8 @@ const FN_REG = {};
 
 function openEvent(s, k, stage, title) {
   s.phase = "EV";
-  s.ev = { k, stage, title: title || "", q: [], i: 0, data: {} };
+  s.evn = (s.evn || 0) + 1;
+  s.ev = { k, n: s.evn, stage, title: title || "", q: [], i: 0, data: {} };
   s.done[s.day + ":" + k] = true;
   return s.ev;
 }
@@ -58,10 +59,11 @@ function startEntry(s, r) {
   beat(s, "dapo", "Good evening, Nigeria! Welcome to the premiere of WAHALA HOUSE!", { anim: "cheer" });
   beat(s, "dapo", "Eleven housemates. One mansion in Lekki. Cameras in every corner. And somewhere among them... two Saboteurs.");
   const order = r.shuffle(AI_IDS);
+  // The entrances play as a montage: each one advances on its own.
   order.forEach((id, i) => {
     const c = BY[id];
-    beat(s, id, c.sig, { enter: id, anim: "strut", sub: `${c.full}, ${c.age}. ${c.job} from ${c.from}.` });
-    beat(s, "dapo", DAPO_QUIPS[i % DAPO_QUIPS.length]);
+    beat(s, id, c.sig, { enter: id, anim: "strut", sub: `${c.full}, ${c.age}. ${c.job} from ${c.from}.`, auto: 2400 });
+    if (i % 3 === 2) beat(s, "dapo", DAPO_QUIPS[i % DAPO_QUIPS.length], { auto: 1400 });
   });
   beat(s, "dapo", `And our final housemate... ${s.hm[0].name}!`, { enter: ME, anim: "strut" });
   choice(s, {
@@ -75,10 +77,6 @@ function startEntry(s, r) {
   });
   beat(s, "eye", "Housemates, this is Mama Eye. Welcome to your home.", { stage: "lounge" });
   beat(s, "eye", "Every room has eyes. Every whisper has ears. And every lie... has consequences.");
-  beat(s, "sys", "Walk anywhere with WASD, the arrow keys, or by tapping the floor. Walk up to a housemate and press E, or tap them, to talk.", { tip: 1 });
-  beat(s, "sys", "Every day you get 10 Social Energy. Spend it to build friendships, ships, squads... or beef.", { tip: 1 });
-  beat(s, "sys", "When people whisper nearby, press L or tap LISTEN to eavesdrop. What you witness becomes a Receipt in your Gist Book (J).", { tip: 1 });
-  beat(s, "sys", "The clock is always running. Press F to fast-forward to the next event.", { tip: 1 });
   cont(s, "roleReveal");
 }
 
@@ -234,7 +232,7 @@ function startHoh(s, r) {
   cont(s, "hohResult");
 }
 
-function aiJollof(s, r, h) { return 900 + BY[h.id].ck * 260 + r.int(900) - (h.comp < 40 ? 250 : 0); }
+function aiJollof(s, r, h) { return 1100 + BY[h.id].ck * 300 + r.int(1000) - (h.comp < 40 ? 250 : 0); }
 
 FN_REG.hohScore = (s, r, v) => { s.ev.data.my = v; };
 FN_REG.hohResult = (s, r) => {
@@ -261,6 +259,11 @@ FN_REG.hohResult = (s, r) => {
 FN_REG.pickTenant = (s, r, v) => {
   s.tenant = v;
   mutual(s, s.hoh, v, F, 8);
+  // Whoever thought they were the HoH's favourite takes it personally.
+  for (const h of aiIn(s)) {
+    if (h.id === s.hoh || h.id === v) continue;
+    if (rel(s, h.id, s.hoh)[F] >= 45) { bump(s, h.id, v, BF, 10); h.comp = clamp(h.comp - 4); }
+  }
   if (s.hoh === ME) bump(s, v, ME, F, 10);
   logEv(s, `${nameOf(s, v)} is the Tenant.`, "power");
 };
@@ -421,6 +424,11 @@ function startNomReveal(s, r) {
     const h = hmOf(s, id);
     h.comp = clamp(h.comp - 18);
     h.fans = clamp(h.fans + 3);
+    // Nominees decide who did this to them.
+    if (id !== ME) {
+      const blame = inHouseIds(s).filter((x) => x !== id).sort((p, q) => liking(s, id, p) - liking(s, id, q))[0];
+      if (blame) bump(s, id, blame, BF, 12);
+    }
     beat(s, "eye", `${nameOf(s, id)}.`, { focus: id, anim: "shock" });
     if (id !== ME && r.chance(0.7)) beat(s, id, r.pick(["Wow. Okay. I see how it is.", "I'm not surprised. I know who did this.", "It's fine. Nigeria will save me.", "Chai! After everything?"]));
   }

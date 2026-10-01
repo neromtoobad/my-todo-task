@@ -39,6 +39,8 @@ img { display: block; }
 .ntag b { position: absolute; bottom: 0; left: 0; transform: translateX(-50%); white-space: nowrap; font: 800 12px/1 var(--body); letter-spacing: 0.04em; padding: 4px 8px 3px; border-radius: 99px; background: rgba(20, 10, 28, 0.78); color: #fff; border: 1.5px solid var(--c); box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35); }
 .ntag .ic { position: absolute; bottom: 20px; left: 0; transform: translateX(-50%); font-size: 22px; font-style: normal; filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.5)); animation: bob 1.4s ease-in-out infinite; }
 .ntag .ic:empty { display: none; }
+.ntag.ic-only b { display: none; }
+.ntag.ic-only .ic { bottom: 0; }
 @keyframes bob { 50% { transform: translate(-50%, -4px); } }
 
 /* ---------- buttons ---------- */
@@ -158,9 +160,26 @@ img { display: block; }
 #prompt { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; max-width: calc(100vw - 32px); z-index: 11; }
 #prompt button { border: 1.5px solid var(--line); background: var(--panel); border-radius: 12px; padding: 9px 14px; font: 800 14px/1.1 var(--body); display: flex; align-items: center; gap: 8px; box-shadow: var(--shadow); animation: popin 0.2s ease-out; }
 #prompt button.hot { border-color: var(--magenta); background: linear-gradient(180deg, #5a1a44, #34102a); }
+#prompt button.do { border-color: rgba(18, 163, 107, 0.6); }
+#prompt button.do kbd { background: var(--emerald); color: #fff; }
 #prompt kbd { display: inline-grid; place-items: center; min-width: 24px; height: 24px; border-radius: 6px; background: var(--gold); color: #2a1400; font: 900 13px var(--body); }
 #prompt .pl { padding: 9px 14px; border-radius: 12px; background: var(--panel); font-weight: 700; }
 
+#hint { position: fixed; left: 50%; top: 74px; transform: translateX(-50%); z-index: 13; display: flex; align-items: center; gap: 10px; max-width: min(560px, calc(100vw - 24px)); padding: 9px 16px 9px 10px; border-radius: 14px; background: rgba(20, 10, 28, 0.9); border: 1.5px solid var(--gold); box-shadow: var(--shadow); font-weight: 800; font-size: 14px; line-height: 1.35; pointer-events: none !important; animation: popin 0.25s ease-out; }
+#hint .hi { flex: none; padding: 4px 8px; border-radius: 8px; background: var(--gold); color: #2a1400; font: 900 10px/1 var(--body); letter-spacing: 0.14em; }
+.gaming #hint { display: none !important; }
+#gist { position: fixed; left: 12px; top: 136px; z-index: 12; display: flex; flex-direction: column; gap: 6px; width: min(270px, 44vw); }
+#gist .gh { font: 900 10px/1 var(--body); letter-spacing: 0.22em; color: var(--magenta); display: flex; align-items: center; gap: 6px; }
+#gist .gh::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #ff2e4d; animation: pulse 1s infinite; }
+#gist button { display: flex; align-items: center; gap: 9px; text-align: left; padding: 8px 10px; border-radius: 12px; border: 1.5px solid var(--line); background: var(--panel); box-shadow: var(--shadow); animation: slidein 0.3s ease-out; }
+#gist button:hover { border-color: var(--gold); }
+#gist button i { font-style: normal; font-size: 20px; }
+#gist button b { display: block; font-size: 13px; line-height: 1.2; }
+#gist button small { display: block; font: 900 9px/1.4 var(--body); letter-spacing: 0.14em; color: var(--muted); }
+#gist .g-argue { border-color: rgba(224, 65, 58, 0.7); background: linear-gradient(180deg, #4a1218, #2a0c14); }
+#gist .g-kiss { border-color: rgba(226, 51, 138, 0.7); }
+.gaming #gist { display: none !important; }
+.banner.small h2 { font-size: clamp(22px, 4vw, 34px); padding: 8px 24px 5px; }
 #toasts { position: fixed; top: 120px; right: 12px; display: flex; flex-direction: column; gap: 6px; align-items: flex-end; z-index: 15; pointer-events: none !important; width: min(340px, calc(100vw - 24px)); }
 .toast { padding: 10px 14px; border-radius: 12px; background: var(--panel); border-left: 4px solid var(--cobalt); font-weight: 700; font-size: 14px; line-height: 1.35; box-shadow: var(--shadow); animation: slidein2 0.3s ease-out; transition: opacity 0.5s, transform 0.5s; }
 .toast.good { border-color: var(--emerald); } .toast.bad { border-color: var(--red); } .toast.strike { border-color: var(--sab); background: #3a0a14; }
@@ -180,6 +199,8 @@ img { display: block; }
 .dfx:empty { display: none; }
 .fx { padding: 4px 9px; border-radius: 99px; background: rgba(242, 182, 50, 0.16); color: var(--gold2); font: 800 12px/1.2 var(--body); }
 .dh { position: absolute; right: 14px; bottom: 8px; font-size: 11px; color: rgba(255, 255, 255, 0.35); font-weight: 700; }
+.dskip { position: absolute; right: 12px; top: -16px; border: 1.5px solid var(--line); background: var(--plum3); color: var(--gold2); border-radius: 99px; padding: 5px 12px; font: 900 11px/1 var(--body); letter-spacing: 0.12em; box-shadow: var(--shadow); }
+.dskip:hover { border-color: var(--gold); }
 #dialog.red .db { background: linear-gradient(180deg, rgba(70, 8, 20, 0.97), rgba(30, 4, 10, 0.97)); border-color: rgba(255, 60, 90, 0.4); }
 #dialog.red .dp { border-color: var(--sab); }
 #dialog.sys .db { padding-left: 20px; border-color: rgba(59, 111, 216, 0.5); }
@@ -441,6 +462,9 @@ img { display: block; }
   .hb { width: 32px; height: 32px; font-size: 15px; border-radius: 9px; }
   #toasts { top: 150px; }
   #feed { display: none; }
+  #gist { top: auto; bottom: 120px; width: min(250px, 70vw); }
+  #gist button:nth-of-type(n+2) { display: none; }
+  #hint { top: 122px; }
   #ff { padding: 7px 10px; font-size: 13px; }
   #ff small { display: none; }
   #prompt { bottom: 72px; }

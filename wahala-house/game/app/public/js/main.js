@@ -49,7 +49,7 @@ function send(m) { if (socket && socket.readyState === 1) { socket.send(JSON.str
 // ------------------------------------------------------------------ app
 const app = {
   view: null, modalOpen: false, dialogOpen: false, choiceOpen: false, busy: false, gameOn: false,
-  fastForward() { const v = app.view; if (v && v.phase === "ROAM" && !app.busy) { act({ t: "ff" }); audio.sfx("s_whoosh", 0.5); } },
+  fastForward() { const v = app.view; if (v && v.phase === "ROAM" && !app.busy) { act({ t: "ff" }); did.ff = true; audio.sfx("s_whoosh", 0.5); } },
   newSeason() { const r = $("#recap"); if (r) r.remove(); endShown = false; send({ type: "reset" }); },
   openShop() { openShop(); },
 };
@@ -60,6 +60,7 @@ app.debug = () => ({
   actors: Object.fromEntries(Object.entries(actors).map(([k, a]) => [k, { fallback: !!a.fallback, ready: a.ready, anim: a.anim, clips: Object.keys(a.clips).length, visible: a.visible, pos: [+a.pos.x.toFixed(2), +a.pos.z.toFixed(2)], y: +(a.yOff || 0).toFixed(2) }])),
 });
 function act(a) { app.busy = true; app.busyAt = performance.now(); send({ type: "action", action: a }); }
+app.act = act; // for QA scripts and the console; the server validates everything
 
 let world, ui, lib = null;
 const actors = {}; // id -> Actor (AI ids, "dapo", "pf", "pm")
@@ -89,6 +90,9 @@ const LOAD_LINES = ["Frying the plantain...", "Waking up Mama Eye...", "Ironing 
 async function boot() {
   world = new World($("#c"));
   ui = new UI(app);
+  const openBook = ui.openBook.bind(ui), openTea = ui.openTea.bind(ui);
+  ui.openBook = () => { did.book = true; openBook(); };
+  ui.openTea = () => { did.tea = true; openTea(); };
   world.follow(new THREE.Vector3(22, 0, 12), true);
   world.setTime(11 * 60);
   requestAnimationFrame(frame);
@@ -155,6 +159,7 @@ function apply(v, prev) {
       ui.lastNote = Math.max(0, ...(v.notes || []).map((n) => n.id));
       lastTalkN = v.last ? v.last.n : 0;
       lastHeard = v.heardId || 0;
+      for (const sc of v.scenes || []) alerted.add(sc.id);
     }
   }
   choosePlayer(v.you.look);
@@ -167,6 +172,8 @@ function apply(v, prev) {
     if (v.phase === "ROAM") { syncRoam(v); checkTalk(v); checkHeard(v); }
     if (v.phase === "END") showEnd(v);
   }
+  renderGist(v);
+  if (v.phase === "ROAM") alertScenes(v);
   if (!app.gameOn) audio.playMusic(musicFor(v));
 }
 
@@ -174,7 +181,7 @@ const EV_MUSIC = { entry: "m_live", live: "m_live", nomreveal: "m_live", wresult
 function musicFor(v) {
   if (!v || v.phase === "LOBBY") return "m_day";
   if (v.phase === "END") return "m_live";
-  if (v.phase === "EV" && v.ev) return EV_MUSIC[v.ev.k] || "m_live";
+  if (v.phase === "EV" && v.ev) return v.ev.k === "approach" ? (v.min >= 1260 || v.min < 420 ? "m_night" : "m_day") : EV_MUSIC[v.ev.k] || "m_live";
   return v.min >= 1260 || v.min < 420 ? "m_night" : "m_day";
 }
 
@@ -207,8 +214,8 @@ function showLobby() {
     AI_IDS.forEach((id, i) => {
       const a = actors[id]; const [room, k] = spots[i];
       const s = spotOf(room, k);
-      const [anim, y] = restFor(s.pose, s.pose === "lounger" ? "sunbathe" : s.pose === "work" ? "workout" : s.pose === "sit" ? "sit" : "idle");
-      a.visible = true; a.place(s.p[0], s.p[1], s.r); a.setBase(anim, y);
+      const [anim, surface] = restFor(s, s.pose === "lounger" ? "sunbathe" : s.pose === "work" ? "workout" : s.pose === "sit" ? "sit" : "idle");
+      a.visible = true; a.place(s.p[0], s.p[1], s.r); a.setBase(anim, a.restY(anim, surface));
     });
     for (const k of ["dapo", "pf", "pm"]) { actors[k].visible = false; actors[k].sync(); }
     camMode = "lobby";
@@ -261,7 +268,25 @@ function syncRoam(v, snap) {
     const a = actors[h.id];
     if (!a) continue;
     a.scene = null;
+    a.watching = null;
     if (h.out) { if (!a.leaving) { a.visible = false; a.path = []; a.sync(); } continue; }
+    const ws = h.watch ? v.scenes.find((z) => z.id === h.watch) : null;
+    if (ws) {
+      // Gather round: stand in a loose ring and stare.
+      const p = pairFor(v, ws);
+      const mid = [(p.A[0] + p.B[0]) / 2, (p.A[1] + p.B[1]) / 2];
+      a.watching = { k: ws.k };
+      const key = `w${ws.id}`;
+      if (a.tkey !== key) {
+        a.tkey = key;
+        const idx = v.hm.filter((z) => z.watch === ws.id).findIndex((z) => z.id === h.id);
+        // Beside and behind the pair (as the camera sees it), never in front of them.
+        const ang = [Math.PI * 0.75, -Math.PI * 0.25, Math.PI * 1.25][Math.max(0, idx) % 3];
+        const [wx, wz] = world.nearestFree(mid[0] + Math.cos(ang) * 1.9, mid[1] + Math.sin(ang) * 1.9);
+        goTo(a, wx, wz, faceTo([wx, wz], mid), "idle", 0, { snap: snap || !a.visible });
+      }
+      continue;
+    }
     const sc = h.sc ? v.scenes.find((z) => z.id === h.sc) : null;
     if (sc) {
       const p = pairFor(v, sc);
@@ -284,8 +309,8 @@ function syncRoam(v, snap) {
     const key = `${h.room}:${h.spot}:${h.act}`;
     if (a.tkey === key && a.visible) continue;
     a.tkey = key;
-    const [anim, y] = restFor(s.pose, h.act);
-    goTo(a, s.p[0], s.p[1], s.r, anim, y, { snap: snap || !a.visible });
+    const [anim, surface] = restFor(s, h.act);
+    goTo(a, s.p[0], s.p[1], s.r, anim, a.restY(anim, surface), { snap: snap || !a.visible });
   }
   // Nobody sits on Dapo's stage between shows.
   actors.dapo.visible = false; actors.dapo.sync();
@@ -323,9 +348,62 @@ function animateScenes(dt) {
     const alt = a.scene.k === "argue" ? "wag" : a.scene.k === "cry" ? "sad" : a.scene.role ? "talk2" : "talk";
     a.setBase(a.baseAnim === mv ? alt : mv);
   }
+  for (const id of AI_IDS) {
+    const a = actors[id];
+    if (!a.watching || a.path.length || !a.visible || a.oneShot || Math.random() < 0.4) continue;
+    const pool = a.watching.k === "argue" ? ["sassy", "wag", "talk2", "angry"] : a.watching.k === "kiss" ? ["cheer", "heart", "happy"] : ["talk2", "happy"];
+    a.gesture(pool[Math.floor(Math.random() * pool.length)], 2.6);
+  }
   // A little life: idle housemates sometimes gesture.
   const idle = AI_IDS.map((id) => actors[id]).filter((a) => a.visible && !a.scene && !a.path.length && a.baseAnim === "idle" && !a.oneShot);
   if (idle.length && Math.random() < 0.5) idle[Math.floor(Math.random() * idle.length)].gesture(["talk2", "sassy", "wave", "happy"][Math.floor(Math.random() * 4)], 3);
+}
+
+// ------------------------------------------------------------------ hot gist
+const GIST_RANK = { argue: 0, kiss: 1, cry: 2, flirt: 3, whisper: 4 };
+const GIST_ICON = { argue: "💢", kiss: "💋", cry: "😢", flirt: "💘", whisper: "🤫" };
+const GIST_VERB = { argue: "are fighting", kiss: "are kissing", cry: "is crying", flirt: "are flirting", whisper: "are whispering" };
+const ROOM_LABEL = { lounge: "Lounge", kitchen: "Kitchen", garden: "Garden", bedroom: "Bedroom", gym: "Gym", hoh: "HoH Lounge" };
+function gistText(sc) {
+  const who = sc.k === "cry" ? nameOf(sc.a) : `${nameOf(sc.a)} & ${nameOf(sc.b)}`;
+  return `${who} ${GIST_VERB[sc.k] || "are talking"}`;
+}
+function renderGist(v) {
+  let box = $("#gist");
+  if (!box) {
+    box = el("div", { id: "gist" });
+    box.addEventListener("click", (e) => { const b = e.target.closest("[data-sc]"); if (b) goToScene(Number(b.dataset.sc)); });
+    ui.root.append(box);
+  }
+  const list = v.phase === "ROAM" && !v.you.out ? v.scenes.filter((sc) => GIST_RANK[sc.k] !== undefined && !sc.heard).sort((a, b) => GIST_RANK[a.k] - GIST_RANK[b.k]).slice(0, 3) : [];
+  box.hidden = !list.length;
+  const html = list.map((sc) => `<button type="button" data-sc="${sc.id}" class="g-${sc.k}"><i>${GIST_ICON[sc.k]}</i><span><b>${gistText(sc)}</b><small>${sc.room === v.you.room ? "RIGHT HERE" : (ROOM_LABEL[sc.room] || sc.room).toUpperCase()}</small></span></button>`).join("");
+  if (box._html !== html) { box._html = html; box.innerHTML = list.length ? `<div class="gh">HOT GIST</div>${html}` : ""; }
+}
+function goToScene(id) {
+  const v = app.view;
+  const sc = v && v.scenes.find((z) => z.id === id);
+  if (!sc || v.phase !== "ROAM" || v.you.out) return;
+  if (sc.room === "hoh" && !(v.you.hoh || v.you.tenant)) { ui.toast("The HoH Lounge is locked. You can only watch from outside.", "info"); return; }
+  const p = pairFor(v, sc);
+  const mid = [(p.A[0] + p.B[0]) / 2, (p.A[1] + p.B[1]) / 2];
+  const [x, z] = world.nearestFree(mid[0] + 1.6, mid[1] + 1.6);
+  player.hurry = true;
+  player.walkTo(world, x, z, faceTo([x, z], mid), () => { player.hurry = false; });
+  did.move = true;
+  did.gist = true;
+  audio.sfx("s_whoosh", 0.3);
+}
+const alerted = new Set();
+function alertScenes(v) {
+  for (const sc of v.scenes) {
+    if (alerted.has(sc.id)) continue;
+    alerted.add(sc.id);
+    if (!gotFirst || v.you.out) continue;
+    const where = sc.room === v.you.room ? "right here" : `in the ${ROOM_LABEL[sc.room] || sc.room}`;
+    if (sc.k === "argue") { ui.toast(`💢 Shouting ${where}! ${nameOf(sc.a)} and ${nameOf(sc.b)} are going at it.`, "bad"); }
+    else if (sc.k === "kiss") { ui.toast(`💋 ${nameOf(sc.a)} and ${nameOf(sc.b)} are kissing ${where}!`, "good"); }
+  }
 }
 
 // ------------------------------------------------------------------ talking & listening
@@ -383,9 +461,16 @@ function checkHeard(v) {
   });
 }
 
-function nearestHousemate(maxD) {
+let talkTarget = null;
+/** Nearest housemate in your room. Sticky: keeps the last target while they stay close. */
+function nearestHousemate(maxD, sticky) {
   const v = app.view;
   if (!v || !player.visible) return null;
+  if (sticky && talkTarget) {
+    const h = v.hm.find((z) => z.id === talkTarget);
+    const a = actors[talkTarget];
+    if (h && !h.out && h.room === v.you.room && a && a.visible && Math.hypot(a.pos.x - player.pos.x, a.pos.z - player.pos.z) < maxD + 0.6) return h;
+  }
   let best = null, bd = maxD;
   for (const h of v.hm) {
     if (h.out || h.room !== v.you.room) continue;
@@ -394,6 +479,7 @@ function nearestHousemate(maxD) {
     const d = Math.hypot(a.pos.x - player.pos.x, a.pos.z - player.pos.z);
     if (d < bd) { bd = d; best = h; }
   }
+  if (sticky) talkTarget = best ? best.id : null;
   return best;
 }
 function sceneHere() {
@@ -412,6 +498,7 @@ function talkTo(id) {
   const open = () => {
     player.wantFace = faceTo([player.pos.x, player.pos.z], [a.pos.x, a.pos.z]);
     ui.openWheel(id, (pick) => act(Object.assign({ t: "talk", who: id }, pick)));
+    did.talk = true;
     audio.sfx("s_ping", 0.35);
   };
   if (d <= 2.4) { open(); return; }
@@ -427,6 +514,7 @@ function listen() {
   const v = app.view;
   if (!sc || !v || v.phase !== "ROAM" || app.busy) return;
   act({ t: "listen", id: sc.id });
+  did.listen = true;
 }
 
 function rest() {
@@ -455,23 +543,36 @@ function openShop() {
 }
 
 // ------------------------------------------------------------------ events
-let evKey = null, handledItem = null, stage = null, entryCount = 0;
+let evKey = null, handledItem = null, stage = null, entryCount = 0, lastItemI = null;
 const STAGE_CAM = { arena: [[28.4, 13.2], 5.4], lounge: [[16.8, 4.8], 5.2], kitchen: [[5.6, 7.2], 5.4], diary: [[61.5, 1.9], 3.0], redroom: [[81.4, 2.3], 3.3] };
 
 function processEv(v) {
   const ev = v.ev;
   if (!ev) return;
-  const key = `${v.day}:${ev.k}`;
+  const key = `${v.day}:${ev.k}:${ev.n || 0}`;
   if (key !== evKey) {
     evKey = key;
     handledItem = null;
+    lastItemI = null;
     const first = ev;
     queue(() => enterEvent(v, first));
   }
   const itemKey = `${key}:${ev.i}`;
   if (itemKey === handledItem) return;
   handledItem = itemKey;
+  const jumped = lastItemI !== null && ev.i > lastItemI + 1;
+  lastItemI = ev.i;
+  if (jumped) queue(() => restage(app.view));
   queue(() => playItem(app.view, app.view.ev));
+}
+
+/** After a skip, put everyone where the show now is (entrances that were skipped included). */
+function restage(v) {
+  if (!v || v.phase !== "EV" || !v.ev) return;
+  ui.hideDialog();
+  clearBoard();
+  const st = v.ev.stageNow || v.ev.stage;
+  return cut(() => arrange(st, v, { k: v.ev.k, i: v.ev.i }));
 }
 
 function cut(fn) {
@@ -486,13 +587,22 @@ async function enterEvent(v, ev) {
   ui.closeWheel(); ui.closeModal(); ui.prompt("");
   player.path = [];
   keys.clear();
-  ui.banner(ev.title || ev.k.toUpperCase());
   entryCount = 0;
-  await cut(() => arrange(ev.stage, v, ev));
+  if (ev.stage === "here") { ui.banner(ev.title || "", null, "small"); arrange("here", v, ev); audio.sfx(ev.title === "WAHALA INCOMING" ? "s_ooh" : "s_ping", 0.5); return; }
+  ui.banner(ev.title || ev.k.toUpperCase());
+  await cut(() => arrange(ev.i > 0 ? ev.stageNow || ev.stage : ev.stage, v, ev));
 }
 
 /** Put everyone on their marks for a stage. */
 function arrange(st, v, ev) {
+  if (st === "here") {
+    // Someone came to you: the house carries on around you.
+    stage = "here";
+    camMode = "follow";
+    camFocusVec = player;
+    zoomTarget = 3.4;
+    return;
+  }
   stage = st;
   for (const [k, l] of Object.entries(world.setLights || {})) l.visible = k === st;
   camMode = "stage";
@@ -510,7 +620,7 @@ function arrange(st, v, ev) {
   const hideAll = () => { for (const k of Object.keys(actors)) { actors[k].visible = false; actors[k].path = []; actors[k].sync(); } };
   if (st === "diary") {
     hideAll();
-    if (meIn) { player.visible = true; player.place(STAGE.diary.p[0], STAGE.diary.p[1], STAGE.diary.r); player.baseAnim = "sit"; player.baseY = 0.42; player.yOff = 0.42; player.play("sit"); }
+    if (meIn) { player.visible = true; player.place(STAGE.diary.p[0], STAGE.diary.p[1], STAGE.diary.r); player.baseAnim = "sit"; player.baseY = player.restY("sit", 0.5); player.yOff = player.baseY; player.play("sit"); }
     return;
   }
   if (st === "redroom") {
@@ -547,15 +657,15 @@ function placeDapo() {
 }
 
 const ANIM_CLIP = { cheer: "cheer", angry: "angry", shock: "sad", sad: "sad", kiss: "heart", point: "wag", strut: "strut", dance: "dance1" };
-const ANIM_MOOD = { cheer: "happy", angry: "angry", shock: "shock", sad: "sad", kiss: "flirty", point: "angry", strut: "happy", dance: "happy" };
+const ANIM_MOOD = { cheer: "happy", angry: "angry", shock: "shock", sad: "sad", kiss: "flirty", point: "angry", strut: "happy", dance: "happy", heart: "flirty", happy: "happy", sassy: "neutral", sneak: "neutral", talk: "neutral", talk2: "neutral", wag: "angry" };
 const HOSTS = new Set(["eye", "dapo", "sys", "whisper"]);
 
 async function playItem(v, ev) {
   if (!v || v.phase !== "EV" || !ev || !ev.item) return;
   const it = ev.item;
   if (it.b) {
-    await playBeat(v, ev, it.b);
-    act({ t: "next" });
+    const how = await playBeat(v, ev, it.b);
+    act({ t: how === "skip" ? "skip" : "next" });
   } else if (it.c) {
     ui.hideDialog();
     clearBoard();
@@ -572,13 +682,16 @@ async function playItem(v, ev) {
 async function playBeat(v, ev, b) {
   if (b.stage && b.stage !== stage) await cut(() => arrange(b.stage, v, null));
   if (b.enter) enterActor(b.enter);
+  if (b.approach) approachPlayer(b.approach);
   const speaker = HOSTS.has(b.w) ? (b.w === "dapo" ? actors.dapo : null) : actorOf(b.w);
+  tagFocus = new Set([b.w, b.focus, b.enter, ...(b.pair || [])].filter(Boolean));
   // Camera: the focus, else the speaker, else the whole stage.
   const focusA = b.focus ? actorOf(b.focus) : null;
   const camOn = (focusA && focusA.visible && focusA) || (b.enter ? null : speaker && speaker.visible ? speaker : null);
   camFocusVec = camOn ? camOn : null;
   if (b.enter) camFocusVec = null;
-  zoomTarget = camOn ? (stage === "diary" || stage === "redroom" ? 2.8 : 3.8) : (STAGE_CAM[stage] || STAGE_CAM.lounge)[1];
+  zoomTarget = camOn ? (stage === "diary" || stage === "redroom" ? 2.8 : stage === "here" ? 3.2 : 3.8) : (STAGE_CAM[stage] || STAGE_CAM.lounge)[1];
+  if (stage === "here" && !camOn) camFocusVec = player;
   // Moves.
   let targets = [];
   if (b.pair) targets = b.pair;
@@ -589,7 +702,7 @@ async function playBeat(v, ev, b) {
   if (b.anim) {
     for (const id of targets) {
       const a = actorOf(id); if (!a || !a.visible) continue;
-      let clip = ANIM_CLIP[b.anim] || "talk";
+      let clip = ANIM_CLIP[b.anim] || (lib && lib.has(b.anim) ? b.anim : "talk");
       if (b.anim === "dance") clip = ["dance1", "dance2", "dance3"][Math.floor(Math.random() * 3)];
       if (b.anim === "strut" && b.enter === id) continue; // already strutting in
       a.gesture(clip, 4);
@@ -609,9 +722,10 @@ async function playBeat(v, ev, b) {
   if (b.ledger) audio.sfx("s_cash", 0.6);
   showBoard(b, v);
   const mood = b.anim ? (b.focus && HOSTS.has(b.w) ? "neutral" : ANIM_MOOD[b.anim]) : "neutral";
-  await ui.line(b.w, b.t, { mood, sub: b.sub, fx: null });
+  const how = await ui.line(b.w, b.t, { mood, sub: b.sub, fx: null, auto: b.auto, skippable: true });
   clearBoard();
   if (b.out) leaveHouse(b.out);
+  return how;
 }
 
 function present() {
@@ -633,6 +747,24 @@ function enterActor(id) {
   a.play("strut");
   camFocusVec = a;
   zoomTarget = 4;
+}
+
+function approachPlayer(id) {
+  const a = actorOf(id);
+  if (!a || !player.visible) return;
+  if (!a.visible) {
+    const v = app.view;
+    const [dx, dz] = world.nearestFree(...(ROOM_DOOR[v.you.room] || ROOM_DOOR.lounge));
+    a.visible = true; a.place(dx, dz, FACE_CAM);
+  }
+  const ddx = a.pos.x - player.pos.x, ddz = a.pos.z - player.pos.z, l = Math.hypot(ddx, ddz) || 1;
+  const [tx, tz] = world.nearestFree(player.pos.x + (ddx / l) * 1.05, player.pos.z + (ddz / l) * 1.05);
+  a.baseAnim = "idle"; a.baseY = 0; a.oneShot = null; a.tkey = null;
+  a.hurry = l > 6;
+  a.walkTo(world, tx, tz, faceTo([tx, tz], [player.pos.x, player.pos.z]), () => { a.hurry = false; });
+  player.path = [];
+  player.wantFace = faceTo([player.pos.x, player.pos.z], [tx, tz]);
+  player.baseAnim = "idle";
 }
 
 function leaveHouse(id) {
@@ -743,17 +875,29 @@ function makeTag(a, id) {
   a.tag = t;
 }
 const tmpV = new THREE.Vector3();
+let tagFocus = new Set();
 function updateTags() {
   const v = app.view;
   const w = window.innerWidth, h = window.innerHeight;
   const roam = v && v.phase === "ROAM";
   const icons = {};
   if (v && v.scenes && roam) for (const sc of v.scenes) { icons[sc.a] = SCENE_ICON[sc.k] || "💬"; }
+  // In the house, name only the few people nearest you; elsewhere, only who is talking.
+  const named = new Set();
+  if (roam && player.visible) {
+    AI_IDS.map((id) => [id, actors[id]]).filter(([, a]) => a.visible).map(([id, a]) => [id, Math.hypot(a.pos.x - player.pos.x, a.pos.z - player.pos.z)])
+      .filter(([, d]) => d < 7).sort((p, q) => p[1] - q[1]).slice(0, 4).forEach(([id]) => named.add(id));
+  } else if (roam) for (const id of AI_IDS) named.add(id);
   for (const [id, a] of Object.entries(actors)) {
     const t = a.tag;
     if (!t) continue;
-    const show = a.visible && !lobbyMode && v && v.phase !== "END" && (id !== "pf" && id !== "pm" ? true : roam) && (!roam || Math.hypot(a.pos.x - player.pos.x, a.pos.z - player.pos.z) < 11 || camMode !== "follow");
+    const isMe = id === "pf" || id === "pm";
+    const key = isMe ? "you" : id;
+    const hasIcon = !!icons[id];
+    const want = roam ? (isMe || named.has(id) || hasIcon) : tagFocus.has(key);
+    const show = want && a.visible && !lobbyMode && v && v.phase !== "END";
     if (!show) { if (!t.hidden) t.hidden = true; continue; }
+    t.classList.toggle("ic-only", roam && !isMe && !named.has(id));
     a.headWorld(tmpV).project(world.camera);
     const x = (tmpV.x * 0.5 + 0.5) * w, y = (-tmpV.y * 0.5 + 0.5) * h;
     if (x < -60 || x > w + 60 || y < -40 || y > h + 40) { t.hidden = true; continue; }
@@ -782,9 +926,14 @@ function updateCamera(dt) {
   else if (camMode === "stage") world.follow(camStage);
   else if (spectate) world.follow(spectate);
   else if (player && player.visible) world.follow(camFocus(player));
+  // The dialogue box covers the bottom of the screen: aim a little lower so
+  // whoever is talking sits above it.
+  const lift = app.dialogOpen ? 0.35 * world.zoom : 0;
+  dialogLift += (lift - dialogLift) * Math.min(1, dt * 4);
+  if (dialogLift > 0.01) world.camTarget.add(camV.set(dialogLift * 0.7071, 0, dialogLift * 0.7071));
   if (Math.abs(world.zoom - zoomTarget) > 0.01) world.setZoom(world.zoom + (zoomTarget - world.zoom) * Math.min(1, dt * 3));
 }
-let spectate = null;
+let spectate = null, dialogLift = 0;
 
 // ------------------------------------------------------------------ input
 const keys = new Set();
@@ -811,7 +960,7 @@ window.addEventListener("keydown", (e) => {
   }
   if (v.phase !== "ROAM") return;
   switch (k) {
-    case "e": { const h = nearestHousemate(2.6); if (h) talkTo(h.id); break; }
+    case "e": { const h = nearestHousemate(2.6, true); if (h) talkTo(h.id); break; }
     case "l": listen(); break;
     case "j": ui.openBook(); break;
     case "tab": ui.openTea(); break;
@@ -819,6 +968,10 @@ window.addEventListener("keydown", (e) => {
     case "q": emote(); break;
     case "r": rest(); break;
     case "b": openShop(); break;
+    case "h": doThing("chores"); break;
+    case "c": doThing("cook"); break;
+    case "n": doThing("snoop"); break;
+    case "p": doThing("prank"); break;
     case "=": case "+": baseZoom = Math.max(4, baseZoom - 1); zoomTarget = baseZoom; break;
     case "-": case "_": baseZoom = Math.min(12, baseZoom + 1); zoomTarget = baseZoom; break;
   }
@@ -859,6 +1012,7 @@ function tap(cx, cy) {
   if (p.x < 0 || p.z < 0 || p.x > WORLD.w || p.z > WORLD.d) return;
   const [x, z] = world.nearestFree(p.x, p.z);
   player.walkTo(world, x, z);
+  did.move = true;
   ripple(cx, cy);
 }
 function ripple(x, y) {
@@ -874,6 +1028,7 @@ document.addEventListener("click", (e) => {
   if (a === "talk") talkTo(b.dataset.id);
   else if (a === "listen") listen();
   else if (a === "rest") rest();
+  else if (a === "do") doThing(b.dataset.w);
 });
 
 // Player movement: screen-relative WASD with wall sliding.
@@ -900,6 +1055,7 @@ function movePlayer(dt) {
     player.oneShot = null;
     if (player.anim !== "walk") player.play("walk", { speed: 1.35 });
     player.moving = true;
+    did.move = true;
   } else if (player.moving) {
     player.moving = false;
     if (!player.path.length) { player.baseAnim = "idle"; player.play("idle"); }
@@ -916,6 +1072,24 @@ function movePlayer(dt) {
 }
 
 let promptT = 0;
+// [action, key, label, rooms, per day]; the server has the same limits.
+const DO_LIST = [
+  ["chores", "h", "DO CHORES", ["kitchen", "lounge"], 3],
+  ["cook", "c", "COOK FOR THE HOUSE", ["kitchen"], 1],
+  ["snoop", "n", "SNOOP", ["bedroom"], 2],
+  ["prank", "p", "PRANK SOMEONE", ["lounge", "garden", "kitchen"], 1],
+];
+const DO_MOVE = { chores: "talk2", cook: "talk2", snoop: "sneak", prank: "happy" };
+function doThing(what) {
+  const v = app.view;
+  if (!v || v.phase !== "ROAM" || v.you.out || app.busy) return;
+  const d = DO_LIST.find((x) => x[0] === what);
+  if (!d || !d[3].includes(v.you.room)) return;
+  act({ t: "do", what });
+  did.doing = true;
+  player.gesture(DO_MOVE[what] || "talk2", 3.5);
+  audio.sfx(what === "cook" ? "s_sizzle" : what === "prank" ? "s_whoosh" : "s_ping", 0.4);
+}
 function updatePrompt(dt) {
   promptT += dt;
   if (promptT < 0.2) return;
@@ -924,7 +1098,7 @@ function updatePrompt(dt) {
   if (!v || v.phase !== "ROAM" || app.modalOpen || app.dialogOpen || app.choiceOpen) { ui.prompt(""); return; }
   if (v.you.out) { ui.prompt(`<span class="pl">YOU ARE WATCHING FROM HOME. Tap or use WASD to look around.</span>`); return; }
   const parts = [];
-  const h = nearestHousemate(2.6);
+  const h = nearestHousemate(2.6, true);
   if (h) parts.push(`<button type="button" data-a="talk" data-id="${h.id}"><kbd>E</kbd> TALK TO ${h.name.toUpperCase()}</button>`);
   const sc = sceneHere();
   if (sc) {
@@ -933,7 +1107,55 @@ function updatePrompt(dt) {
     parts.push(`<button type="button" data-a="listen" class="hot"><kbd>L</kbd> LISTEN: ${what}</button>`);
   }
   if (v.you.room === "bedroom" || v.you.room === "gym") parts.push(`<button type="button" data-a="rest"><kbd>R</kbd> ${v.you.room === "gym" ? "WORK OUT" : "REST"}</button>`);
+  // Free things to do in this room (no energy needed).
+  const dn = v.you.doings || {};
+  const someone = v.hm.some((h) => !h.out && h.room === v.you.room && h.act !== "sleep");
+  for (const [what, key, label, rooms, max] of DO_LIST) {
+    if (!rooms.includes(v.you.room) || (dn[what] || 0) >= max) continue;
+    if (what === "prank" && !someone) continue;
+    parts.push(`<button type="button" data-a="do" data-w="${what}" class="do"><kbd>${key.toUpperCase()}</kbd> ${label}</button>`);
+  }
   ui.prompt(parts.join(""));
+}
+
+// ------------------------------------------------------------------ hints
+// One tip at a time, shown when it becomes useful, gone once you've done it.
+const did = { move: false, talk: false, listen: false, book: false, tea: false, ff: false, gist: false, doing: false };
+let hintsSeen = {};
+try { hintsSeen = JSON.parse(localStorage.getItem("wh:hints") || "{}"); } catch {}
+const HINTS = [
+  { id: "move", text: "Walk with WASD or the arrow keys, or tap the floor.", when: () => true, done: () => did.move },
+  { id: "talk", text: "Walk up to a housemate and press E, or tap them, to talk.", when: () => !!nearestHousemate(5), done: () => did.talk },
+  { id: "listen", text: "Someone is talking nearby. Press L to listen in: what you hear becomes a Receipt.", when: () => !!sceneHere(), done: () => did.listen },
+  { id: "gist", text: "Drama alert! Tap a HOT GIST item on the left to run straight there.", when: (v) => v.scenes.some((sc) => sc.k === "argue" || sc.k === "kiss"), done: () => did.gist },
+  { id: "energy", text: "Every move costs Social Energy. You get 10 a day, so spend it on the people who matter.", when: () => did.talk, ms: 7000 },
+  { id: "book", text: "You have a Receipt! Press J to open your Gist Book.", when: (v) => v.gb.some((g) => g.k === "receipt"), done: () => did.book },
+  { id: "tea", text: "Press TAB for the Tea Board: how every housemate feels about you.", when: (v) => v.day >= 1, done: () => did.tea },
+  { id: "doing", text: "Things to do that cost no energy: chores for coins, cooking for the house, snooping in the bedroom. Look for the buttons at the bottom.", when: (v) => v.day >= 1 && ["kitchen", "bedroom", "lounge"].includes(v.you.room), done: () => did.doing },
+  { id: "ff", text: "Out of energy or waiting? Press F to skip ahead to the next show.", when: (v) => v.you.energy <= 3 || v.min >= 1380, done: () => did.ff },
+];
+let hintNow = null, hintSince = 0, hintT = 0;
+function markHint(id) { hintsSeen[id] = 1; try { localStorage.setItem("wh:hints", JSON.stringify(hintsSeen)); } catch {} }
+function updateHints(dt) {
+  hintT += dt;
+  if (hintT < 0.5) return;
+  hintT = 0;
+  const v = app.view;
+  const quiet = !v || v.phase !== "ROAM" || v.you.out || app.modalOpen || app.dialogOpen || app.choiceOpen || app.gameOn;
+  if (hintNow) {
+    const h = HINTS.find((x) => x.id === hintNow);
+    const finished = (h.done && h.done(v)) || (h.ms && performance.now() - hintSince > h.ms);
+    if (finished) { markHint(h.id); hintNow = null; ui.hint(""); return; }
+    if (quiet) ui.hint("");
+    else ui.hint(h.text);
+    return;
+  }
+  if (quiet) return;
+  for (const h of HINTS) {
+    if (hintsSeen[h.id]) continue;
+    if (h.done && h.done(v)) { markHint(h.id); continue; }
+    if (h.when(v)) { hintNow = h.id; hintSince = performance.now(); ui.hint(h.text); audio.sfx("s_ping", 0.25); return; }
+  }
 }
 
 // ------------------------------------------------------------------ clock
@@ -962,6 +1184,7 @@ function frame() {
     animateScenes(dt);
     clockTick(dt);
     updatePrompt(dt);
+    updateHints(dt);
   }
   updateCamera(dt);
   const v = app.view;
@@ -969,7 +1192,7 @@ function frame() {
   if (Math.abs(target - shownMin) > 180) shownMin = target;
   else shownMin += (target - shownMin) * Math.min(1, dt * 1.5);
   lightT += dt;
-  if (lightT > 0.2) { lightT = 0; world.setTime(stage === "arena" && v && v.ev && ["live", "party", "entry"].includes(v.ev.k) ? Math.max(shownMin, 1260) : shownMin, world.partyMode); }
+  if (lightT > 0.2) { lightT = 0; world.dark = !!(v && v.dark); world.setTime(stage === "arena" && v && v.ev && ["live", "party", "entry"].includes(v.ev.k) ? Math.max(shownMin, 1260) : shownMin, world.partyMode); }
   world.update(dt, t);
   // A full-screen mini-game hides the house: don't pay to draw it.
   const covered = app.gameOn && app.gameKind !== "dance";

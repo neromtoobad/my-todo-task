@@ -30,6 +30,7 @@ function run(s, r, n) {
     if (s.phase !== "ROAM") return;
     const due = advance(s, r);
     if (due) { trigger(s, r, due); if (s.phase !== "ROAM") return; if (due === "sleep") return; }
+    else if (s.min % 30 === 20 && (maybeIncident(s, r) || maybeApproach(s, r))) { evRun(s, r); return; }
   }
 }
 
@@ -41,6 +42,7 @@ function fastForward(s, r) {
     guard += 1;
     const due = advance(s, r);
     if (due) { trigger(s, r, due); if (s.phase !== "ROAM" || due === "sleep" || s.day !== day) return; }
+    else if (s.min % 30 === 20 && (maybeIncident(s, r) || maybeApproach(s, r))) { evRun(s, r); return; }
     if (s.min >= target && s.phase === "ROAM" && !due) return;
   }
 }
@@ -55,12 +57,34 @@ export function setup(players) {
 
 const PHASE_ACTIONS = {
   LOBBY: ["start"],
-  EV: ["next", "pick", "score"],
-  ROAM: ["tick", "ff", "room", "talk", "listen", "buy", "rest"],
+  EV: ["next", "skip", "pick", "score"],
+  ROAM: ["tick", "ff", "room", "talk", "listen", "buy", "rest", "do"],
   END: [],
 };
 
 function current(s) { return s.ev ? s.ev.q[s.ev.i] : null; }
+
+/** A beat that carries a result the player must see; skipping always stops on one. */
+function isKeyBeat(b) { return !!(b.key || b.focus || b.out || b.reveal || b.board || b.ledger || b.votes || b.team || b.missing || b.callers); }
+
+/** Skip ahead through talk to the next result, choice or mini-game. */
+function skipBeats(s, r) {
+  s.ev.i += 1;
+  evRun(s, r);
+  for (let guard = 0; s.ev && guard < 400; guard++) {
+    const it = current(s);
+    if (!it || !it.b || isKeyBeat(it.b)) return;
+    s.ev.i += 1;
+    evRun(s, r);
+  }
+}
+
+/** The set the show is on right now (beats can move it mid-event). */
+function stageNow(ev) {
+  let st = ev.stage;
+  for (let k = 0; k <= ev.i && k < ev.q.length; k++) if (ev.q[k].b && ev.q[k].b.stage) st = ev.q[k].b.stage;
+  return st;
+}
 
 export function validateAction(state, playerId, action) {
   const s = state;
@@ -81,7 +105,7 @@ export function validateAction(state, playerId, action) {
       if (!isInt(a.seed)) return { ok: false, error: "bad seed" };
       return { ok: true };
     }
-    case "next": { const it = current(s); return it && it.b ? { ok: true } : { ok: false, error: "nothing to advance" }; }
+    case "next": case "skip": { const it = current(s); return it && it.b ? { ok: true } : { ok: false, error: "nothing to advance" }; }
     case "pick": {
       const it = current(s);
       if (!it || !it.c) return { ok: false, error: "no choice pending" };
@@ -109,6 +133,11 @@ export function validateAction(state, playerId, action) {
       return { ok: false, error: "bad game" };
     }
     case "tick": case "ff": return { ok: true };
+    case "do": {
+      if (typeof a.what !== "string" || !DOINGS[a.what]) return { ok: false, error: "bad activity" };
+      const why = canDo(s, a.what);
+      return why ? { ok: false, error: why } : { ok: true };
+    }
     case "rest": {
       if (me.out) return { ok: false, error: "you are out" };
       if (me.room !== "bedroom" && me.room !== "gym") return { ok: false, error: "rest in the bedroom or work out in the gym" };
@@ -160,6 +189,7 @@ export function applyAction(state, playerId, action) {
   s.last = a.t === "talk" ? s.last : null;
   switch (a.t) {
     case "next": s.ev.i += 1; evRun(s, r); break;
+    case "skip": skipBeats(s, r); break;
     case "pick": {
       const it = current(s);
       s.ev.i += 1;
@@ -176,6 +206,7 @@ export function applyAction(state, playerId, action) {
     }
     case "tick": run(s, r, 1); break;
     case "ff": fastForward(s, r); break;
+    case "do": doThing(s, r, a.what); run(s, r, DOINGS[a.what].ticks); break;
     case "rest": {
       if (me.room === "bedroom") { me.comp = clamp(me.comp + 15); note(s, "You rested. Composure +15.", "good"); run(s, r, 6); }
       else { me.comp = clamp(me.comp + 8); me.fans = clamp(me.fans + 1); note(s, "Good workout. Composure +8.", "good"); run(s, r, 3); }
@@ -218,7 +249,7 @@ export function viewFor(state, playerId) {
     if (h.strikes) badges.push("STRIKES " + h.strikes);
     const sh = findShip(s, ME, h.id);
     return {
-      id: h.id, name: h.name, out: h.out ? h.out.how : null, room: h.room, spot: h.spot, act: h.act, with: h.with, sc: h.sc,
+      id: h.id, name: h.name, out: h.out ? h.out.how : null, room: h.room, spot: h.spot, act: h.act, with: h.with, sc: h.sc, watch: h.watch || null,
       badges, strikes: h.strikes,
       feel: { f: level(v[F]), r: level(v[RO]), t: level(v[TR]), b: level(v[BF]) },
       promised: s.prom[h.id + ">" + ME] === "save", squad: inSquad(s, h.id), ship: sh ? (sh.official ? "official" : "spark") : null,
@@ -228,7 +259,7 @@ export function viewFor(state, playerId) {
   });
   const scenes = s.scenes.filter((sc) => sc.until > s.min && sc.d === s.day).map((sc) => ({ id: sc.id, k: PUBLIC_KIND[sc.k], room: sc.room, a: sc.a, b: sc.b, heard: sc.heard }));
   const it = s.ev ? s.ev.q[s.ev.i] : null;
-  const ev = s.ev ? { k: s.ev.k, stage: s.ev.stage, title: s.ev.title, i: s.ev.i, item: it ? { b: it.b, c: it.c ? Object.assign({}, it.c, { h: undefined, auto: undefined }) : undefined, m: it.m ? Object.assign({}, it.m, { h: undefined }) : undefined } : null } : null;
+  const ev = s.ev ? { k: s.ev.k, n: s.ev.n || 0, stage: s.ev.stage, stageNow: stageNow(s.ev), title: s.ev.title, i: s.ev.i, item: it ? { b: it.b, c: it.c ? Object.assign({}, it.c, { h: undefined, auto: undefined }) : undefined, m: it.m ? Object.assign({}, it.m, { h: undefined }) : undefined } : null } : null;
   const nextM = nextEventMin(s);
   const nextK = (SCHEDULE[s.day] || []).find(([m, k]) => m === nextM && !s.done[s.day + ":" + k]);
   return {
@@ -238,7 +269,9 @@ export function viewFor(state, playerId) {
       name: me.name, look: me.look, role: me.role, partner, energy: me.energy, coins: me.coins, comp: me.comp, fans: me.fans,
       strikes: me.strikes, room: me.room, immune: me.immune, out: me.out ? me.out.how : null,
       hoh: s.hoh === ME, tenant: s.tenant === ME, nominated: nomsPublic && s.noms.includes(ME),
+      doings: Object.fromEntries(Object.keys(DOINGS).map((k) => [k, doneToday(s, k)])),
     },
+    dark: !!s.dark && s.dark > s.day * 1440 + s.min,
     hm,
     ships: s.ships.filter((sh) => sh.official || sh.a === ME || sh.b === ME).map((sh) => ({ a: sh.a, b: sh.b, name: sh.name, official: sh.official })),
     beefs: s.beefs.slice(-20),

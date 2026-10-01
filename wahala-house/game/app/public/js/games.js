@@ -174,7 +174,7 @@ async function jollof(spec, ctx) {
     else if (s.state === "ready") {
       if (plate[s.k]) { floater(s.el, `Plate has ${FOOD[s.k].name}`, "meh"); return; }
       plate[s.k] = true; s.state = "empty"; drawPlate(); audio.sfx("s_whoosh", 0.3);
-    } else if (s.state === "burnt") { s.state = "empty"; score -= 30; floater(s.el, "-30", "bad"); audio.sfx("s_whoosh", 0.3); }
+    } else if (s.state === "burnt") { s.state = "empty"; score -= 50; floater(s.el, "-50", "bad"); audio.sfx("s_whoosh", 0.3); }
     drawStation(s);
   }
   function drawStation(s) {
@@ -191,7 +191,7 @@ async function jollof(spec, ctx) {
   function addOrder() {
     const d = pickDish();
     const id = pick(who);
-    const o = { id: ++oid, d, who: id, t0: t, pat: (hard ? 15 : 20) + d.items.length * 3 };
+    const o = { id: ++oid, d, who: id, t0: t, pat: (hard ? 13 : 17) + d.items.length * 2.5 };
     o.el = el("button", { class: "ticket", type: "button", onclick: () => serve(o), style: { "--c": CAST[id] ? CAST[id].color : "#f2b632" } },
       el("img", { src: ctx.portrait(id, "neutral"), alt: "" }),
       el("div", { class: "tk" }, el("b", { text: d.n }), el("span", { class: "ti", text: d.items.map((k) => FOOD[k].icon).join(" ") }), el("small", { text: `${ctx.nameOf(id)}: "${pick(ORDER_LINES)}"` })),
@@ -207,7 +207,7 @@ async function jollof(spec, ctx) {
     if (!ok) { o.el.classList.remove("shake"); void o.el.offsetWidth; o.el.classList.add("shake"); floater(o.el, "Wrong plate!", "bad"); audio.sfx("s_ooh", 0.3); combo = 0; drawHead(); return; }
     const left = 1 - (t - o.t0) / o.pat;
     combo += 1;
-    const pts = Math.round((80 * o.d.items.length + 80 * left) * (1 + Math.min(10, combo) * 0.05));
+    const pts = Math.round((80 * o.d.items.length + 80 * left) * (1 + Math.min(8, combo) * 0.04));
     score += pts; served += 1;
     plate.rice = plate.dodo = plate.chicken = false; drawPlate();
     o.el.querySelector("img").src = ctx.portrait(o.who, "happy");
@@ -223,7 +223,7 @@ async function jollof(spec, ctx) {
   return new Promise((res) => {
     const stop = loop((dt) => {
       t += dt;
-      if (t >= nextOrder && orders.length < 4) { addOrder(); nextOrder = t + Math.max(3.2, 7 - t / 20) * (hard ? 0.85 : 1); }
+      if (t >= nextOrder && orders.length < 4) { addOrder(); nextOrder = t + Math.max(2.6, 6.5 - t / 15) * (hard ? 0.85 : 1); }
       for (const s of st) {
         if (s.state === "cook" && t - s.t0 >= s.cook) { s.state = "ready"; audio.sfx("s_chime", 0.25); }
         else if (s.state === "ready" && t - s.t0 >= s.cook + s.win) { s.state = "burnt"; combo = 0; audio.sfx("s_buzzer", 0.3); floater(s.el, "BURNT!", "bad"); }
@@ -235,7 +235,7 @@ async function jollof(spec, ctx) {
         o.el.classList.toggle("late", left < 0.3);
         if (left <= 0) {
           orders.splice(orders.indexOf(o), 1);
-          score -= 60; combo = 0; missed += 1;
+          score -= 80; combo = 0; missed += 1;
           o.el.querySelector("img").src = ctx.portrait(o.who, "angry");
           o.el.classList.add("gone");
           audio.sfx("s_ooh", 0.35);

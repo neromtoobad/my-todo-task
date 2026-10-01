@@ -123,30 +123,30 @@ export const FURNITURE = [
  */
 export const SPOTS = {
   lounge: [
-    { p: [13.6, 1.35], r: 0, pose: "sit" }, { p: [14.8, 1.35], r: 0, pose: "sit" }, { p: [16, 1.35], r: 0, pose: "sit" },
-    { p: [17.2, 1.35], r: 0, pose: "sit" }, { p: [18.4, 1.35], r: 0, pose: "sit" },
-    { p: [12.35, 2.9], r: Math.PI / 2, pose: "sit" }, { p: [12.35, 4.2], r: Math.PI / 2, pose: "sit" },
-    { p: [21.1, 3], r: -Math.PI / 2, pose: "sit" },
+    { p: [13.6, 1.35], r: 0, pose: "sit", seat: 0.4 }, { p: [14.8, 1.35], r: 0, pose: "sit", seat: 0.4 }, { p: [16, 1.35], r: 0, pose: "sit", seat: 0.4 },
+    { p: [17.2, 1.35], r: 0, pose: "sit", seat: 0.4 }, { p: [18.4, 1.35], r: 0, pose: "sit", seat: 0.4 },
+    { p: [12.35, 2.9], r: Math.PI / 2, pose: "sit", seat: 0.4 }, { p: [12.35, 4.2], r: Math.PI / 2, pose: "sit", seat: 0.4 },
+    { p: [21.1, 3], r: -Math.PI / 2, pose: "sit", seat: 0.4 },
   ],
   kitchen: [
     { p: [3.6, 1.35], r: Math.PI, pose: "stand", cook: 1 }, { p: [9.2, 1.4], r: Math.PI, pose: "stand" },
-    { p: [4, 3.55], r: 0, pose: "sit" }, { p: [5.5, 3.55], r: 0, pose: "sit" }, { p: [7, 3.55], r: 0, pose: "sit" },
-    { p: [5.2, 6.7], r: 0, pose: "sit" },
+    { p: [4, 3.55], r: 0, pose: "sit", seat: 0.75 }, { p: [5.5, 3.55], r: 0, pose: "sit", seat: 0.75 }, { p: [7, 3.55], r: 0, pose: "sit", seat: 0.75 },
+    { p: [5.2, 6.7], r: 0, pose: "sit", seat: 0.49 },
   ],
   garden: [
-    ...[0, 1, 2, 3, 4, 5].map((i) => ({ p: [26.4, 17 + i * 1.1], r: -Math.PI / 2, pose: "lounger" })),
+    ...[0, 1, 2, 3, 4, 5].map((i) => ({ p: [26.4, 17 + i * 1.1], r: -Math.PI / 2, pose: "lounger", seat: 0.41 })),
     { p: [32.5, 20], r: FACE_CAM, pose: "stand" }, { p: [14, 15.5], r: FACE_CAM, pose: "stand" },
-    { p: [29.5, 23.9], r: Math.PI, pose: "sit" }, { p: [20, 15.4], r: 0, pose: "stand" },
+    { p: [29.5, 24.42], r: Math.PI, pose: "sit", seat: 0.5 }, { p: [20, 15.4], r: 0, pose: "stand" },
   ],
   bedroom: [
-    ...[0, 1, 2, 3, 4, 5].map((i) => ({ p: [1.35, 11 + i * 1.8], r: Math.PI / 2, pose: "bed" })),
-    ...[0, 1, 2, 3, 4, 5].map((i) => ({ p: [9.65, 11 + i * 1.8], r: -Math.PI / 2, pose: "bed" })),
+    ...[0, 1, 2, 3, 4, 5].map((i) => ({ p: [1.35, 11 + i * 1.8], r: Math.PI / 2, pose: "bed", seat: 0.48 })),
+    ...[0, 1, 2, 3, 4, 5].map((i) => ({ p: [9.65, 11 + i * 1.8], r: -Math.PI / 2, pose: "bed", seat: 0.48 })),
   ],
   gym: [
     { p: [13, 12.9], r: 0, pose: "work" }, { p: [15.2, 11.3], r: 0, pose: "work" }, { p: [13.5, 14], r: FACE_CAM, pose: "work" },
   ],
   hoh: [
-    { p: [26.5, 2.9], r: 0, pose: "sit" }, { p: [24.5, 4.7], r: Math.PI / 2, pose: "sit" }, { p: [24.5, 5.8], r: Math.PI / 2, pose: "sit" }, { p: [28.5, 5.8], r: FACE_CAM, pose: "sit" },
+    { p: [26.5, 2.35], r: 0, pose: "sit", seat: 0.53 }, { p: [24.5, 4.7], r: Math.PI / 2, pose: "sit", seat: 0.4 }, { p: [24.5, 5.8], r: Math.PI / 2, pose: "sit", seat: 0.4 }, { p: [28.5, 5.8], r: FACE_CAM, pose: "sit", seat: 0.3 },
   ],
 };
 

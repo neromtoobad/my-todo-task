@@ -52,6 +52,7 @@ function initSeason(pid, a) {
       v[F] = f; v[RO] = ro; v[TR] = t; v[BF] = b; if (ro) v[AT] = Math.max(v[AT], 60);
     }
   }
+  seedRivalries(s, r);
   // Saboteurs quietly look after each other.
   if (sabs[0] !== ME && sabs[1] !== ME) { mutual(s, sabs[0], sabs[1], TR, 25); mutual(s, sabs[0], sabs[1], F, 10); }
 
@@ -117,6 +118,7 @@ function placeAI(s, r) {
     if (room !== h.room) { h.room = room; h.spot = freeSpot(s, r, room, h.id); }
     h.act = activityFor(s, r, h, room);
     h.with = null;
+    h.watch = null;
   }
 }
 
@@ -131,10 +133,12 @@ function pickSceneKind(s, r, a, b, room, alone) {
   const night = s.min >= 1260;
   if (isSab(s, a) && isSab(s, b) && alone && r.chance(0.7)) return "scheme";
   if (ab[RO] >= 68 && ba[RO] >= 58 && (night || room === "hoh" || room === "garden") && r.chance(0.6)) return "kiss";
+  // Real grudges boil over before anything else; hot heads boil over sooner.
+  const beef = Math.max(ab[BF], ba[BF]), temper = Math.max(BY[a].tp, BY[b].tp);
+  if (beef >= 55 && r.chance(0.8)) return "argue";
   if ((ab[RO] >= 35 || ba[RO] >= 35) && Math.max(ab[AT], ba[AT]) >= 45 && r.chance(0.7)) return "flirt";
-  if ((ab[BF] >= 50 || ba[BF] >= 50) && r.chance(0.75)) return "argue";
-  const hm = hmOf(s, a);
-  if (hm.comp < 32 && ab[F] >= 35) return "cry";
+  if (beef >= 38 && r.chance(0.3 + temper * 0.12)) return "argue";
+  if (Math.min(hmOf(s, a).comp, hmOf(s, b).comp) < 45 && Math.max(ab[F], ba[F]) >= 30 && r.chance(0.65)) return "cry";
   if ((BY[a].sc >= 4 || BY[b].sc >= 4) && ab[F] >= 38 && s.day >= 1 && s.day <= 3 && r.chance(0.45)) return "deal";
   if (ab[F] >= 40 && r.chance(0.55)) return "gossip";
   if (Math.max(ab[AT], ba[AT]) >= 60 && r.chance(0.35)) return "flirt";
@@ -164,8 +168,9 @@ function startScene(s, r, kind, a, b, room) {
   s.scid += 1;
   const sc = { id: s.scid, k: kind, room, a, b, x, until: s.min + 30 + 10 * r.int(2), lines, heard: false, d: s.day };
   s.scenes.push(sc);
-  for (const id of [a, b]) { const h = hmOf(s, id); h.sc = sc.id; h.with = id === a ? b : a; h.act = kind; }
+  for (const id of [a, b]) { const h = hmOf(s, id); h.sc = sc.id; h.with = id === a ? b : a; h.act = kind; h.watch = null; }
   applyScene(s, r, sc);
+  if (kind === "argue" || kind === "kiss") gatherCrowd(s, r, sc);
   return sc;
 }
 
@@ -190,7 +195,7 @@ function applyScene(s, r, sc) {
         if (rel(s, h.id, p)[RO] >= 40) { bump(s, h.id, q, BF, 14); h.comp = clamp(h.comp - 10); if (h.human) note(s, `${A.name} and ${B.name} just kissed. Your heart...`, "love"); }
       }
     }
-    for (const w of others) remember(s, w.id, { k: "kiss", x: a, y: b });
+    for (const w of others) remember(s, w.id, { k: "kiss", x: a, y: b, room: ROOMS[sc.room].name.toLowerCase() });
   } else if (k === "argue") {
     mutual(s, a, b, BF, 10); mutual(s, a, b, F, -8);
     A.comp = clamp(A.comp - 9); B.comp = clamp(B.comp - 9);
@@ -198,6 +203,7 @@ function applyScene(s, r, sc) {
     addBeef(s, a, b);
     tweet(s, r, "fight", a, b);
     logEv(s, `${A.name} and ${B.name} had a loud fight in the ${ROOMS[sc.room].name}.`, "fight");
+    for (const w of others) remember(s, w.id, { k: "fight", x: a, y: b, room: ROOMS[sc.room].name.toLowerCase() });
     for (const h of [A, B]) {
       const c = BY[h.id];
       if (c.tp >= 4 && h.comp < 50 && r.chance(0.3)) strike(s, r, h.id, "threatening another housemate");
@@ -231,6 +237,7 @@ function endScene(s, sc) {
     const h = hmOf(s, id);
     if (h && h.sc === sc.id) { h.sc = null; h.with = null; h.act = "idle"; }
   }
+  for (const h of s.hm) if (h.watch === sc.id) { h.watch = null; h.act = "idle"; }
 }
 
 /** Every half hour, the house makes content. */
@@ -251,6 +258,8 @@ function runScenes(s, r) {
     }
     const present = inHouse(s).filter((h) => h.room === room && h.act !== "sleep").length;
     const kind = pickSceneKind(s, r, best[0], best[1], room, present === 2);
+    // The one crying is whoever is lower on composure.
+    if (kind === "cry" && hmOf(s, best[1]).comp < hmOf(s, best[0]).comp) best.reverse();
     startScene(s, r, kind, best[0], best[1], room);
     busy.add(best[0]); busy.add(best[1]);
   }

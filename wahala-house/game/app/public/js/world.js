@@ -113,6 +113,15 @@ export class World {
     for (const l of this.lamps) l.intensity = n * 14;
     for (const l of this.neon) l.intensity = (party ? 1 : n * 0.6) * 22;
     for (const s of this.glow || []) s.material.opacity = 0.15 + n * 0.85;
+    if (this.dark) {
+      // NEPA has taken light: only moonlight.
+      this.sun.intensity = 0.12; this.sun.color.set(0x8090ff);
+      this.hemi.intensity = 0.22;
+      for (const l of this.lamps) l.intensity = 0;
+      for (const l of this.neon) l.intensity = 0;
+      for (const s of this.glow || []) s.material.opacity = 0.05;
+      this.scene.background.set(0x07040e); this.scene.fog.color.set(0x07040e);
+    }
     this.nightLevel = n;
   }
 
@@ -221,7 +230,7 @@ export class World {
       case "sofa": {
         const g = grp();
         const vel = this.mat(PAL.emerald, { roughness: 0.95 });
-        part(g, RB(w, 0.45, d, 0.12), vel, 0, 0.25, 0);
+        part(g, RB(w, 0.34, d, 0.1), vel, 0, 0.23, 0);
         part(g, RB(w, 0.6, 0.25, 0.1), vel, 0, 0.6, -d / 2 + 0.12);
         part(g, RB(0.25, 0.35, d, 0.1), vel, -w / 2 + 0.12, 0.55, 0);
         part(g, RB(0.25, 0.35, d, 0.1), vel, w / 2 - 0.12, 0.55, 0);
@@ -231,7 +240,7 @@ export class World {
       }
       case "armchair": {
         const g = grp(); const vel = this.mat(PAL.magenta, { roughness: 0.95 });
-        part(g, RB(w, 0.45, d, 0.12), vel, 0, 0.25, 0); part(g, RB(w, 0.6, 0.22, 0.1), vel, 0, 0.6, -d / 2 + 0.11);
+        part(g, RB(w, 0.34, d, 0.1), vel, 0, 0.23, 0); part(g, RB(w, 0.6, 0.22, 0.1), vel, 0, 0.6, -d / 2 + 0.11);
         part(g, RB(0.2, 0.3, d, 0.08), vel, -w / 2 + 0.1, 0.55, 0); part(g, RB(0.2, 0.3, d, 0.08), vel, w / 2 - 0.1, 0.55, 0);
         add(g); break;
       }
