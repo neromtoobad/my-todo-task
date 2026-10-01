@@ -9,6 +9,31 @@ audio mix and input feel on a real device were not judged here.
 Numbers below come from a scripted season (`seed 7`, player idle unless noted)
 and from measuring bone heights on the real models.
 
+## Progress
+
+Done (1 Oct 2026):
+
+- **The first minute.** Entry night auto-plays as a montage; SKIP jumps through
+  talk but always stops on beats that matter (your role, votes, results). In-play
+  hints teach one control at a time.
+- **Make the wahala happen.** Seeded rivalries, fights that boil over, crowds
+  that gather, a hot-gist feed with alerts, and housemates who walk up to you to
+  confront you, flirt, share gist, pitch a deal or just get to know you.
+- **Fill the day.** Chores, cooking, snooping and pranks; daytime incidents
+  (missing jollof, palm wine, NEPA blackout, an anonymous letter).
+- **Quick wins.** Bodies sit on seats, beds and loungers at the measured height;
+  tags declutter; the talk target is sticky; Jollof Rush is harder.
+- **Everyone sounds the same.** Every housemate now answers in their own voice
+  for the common moves, opens scenes in their own words, and brings up what you
+  did (a kiss they saw, a fight, a broken promise, a lie, a gift, a joke).
+  More player lines and scene scripts.
+- **Stage it.** Conversations cut to a close-up with reaction pops and nearby
+  housemates turning to watch; shows cut to housemates reacting; the evicted
+  housemate waves goodbye and walks out past the house.
+
+Still open: more voiced show lines (costs credits), the mini-game notes, the
+interface notes, and the longer-term items.
+
 ## The big five
 
 ### 1. The house is too calm. Make the wahala happen, and make it findable.

@@ -165,6 +165,12 @@ function startScene(s, r, kind, a, b, room) {
     const sp = who === "A" ? a : who === "B" ? b : null;
     return { w: sp, t: sp ? fill(s, r, text, sp, { x }) : text.replace(/\{x\}/g, x ? nameOf(s, x) : "") };
   });
+  // Sometimes the first speaker opens in their own voice.
+  const own = sceneOpener(r, a, kind);
+  if (own) {
+    const first = { w: a, t: fill(s, r, own, a, { x }) };
+    if (kind === "gossip") lines[0] = first; else lines.unshift(first);
+  }
   s.scid += 1;
   const sc = { id: s.scid, k: kind, room, a, b, x, until: s.min + 30 + 10 * r.int(2), lines, heard: false, d: s.day };
   s.scenes.push(sc);

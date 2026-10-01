@@ -4,28 +4,28 @@
 
 /** What the player says for each move. */
 const SAY = {
-  chat: ["How far? How is the house treating you?", "Talk to me. What's the gist today?", "You good? You look like you've been thinking."],
-  joke: ["Why did the jollof go to school? To get more flavour. Hahaha!", "If Mama Eye was a person, she'd be that auntie at every party.", "Tobi's chain is so heavy, it has its own Wi-Fi."],
-  compliment: ["Your outfit today? Unmatched.", "You have the best energy in this house, honestly.", "I like how you carry yourself. Real class."],
-  deep: ["Can we talk for real? No cameras, no games.", "What made you come here? The real reason.", "Who are you when nobody is watching?"],
-  hug: ["Come here, big hug.", "You look like you need a hug."],
-  gift: ["I saved you a plate of jollof. The good part.", "Small something for you. Don't say I never did anything."],
-  flirt: ["Has anybody told you that you look dangerous today?", "I keep finding reasons to sit next to you. Funny.", "If this house had a crush list, you'd be top."],
-  askout: ["Let's stop pretending. Be my person in this house.", "I like you. For real. Let's make it official."],
+  chat: ["How far? How is the house treating you?", "Talk to me. What's the gist today?", "You good? You look like you've been thinking.", "Abeg, how was your night? You look like you didn't sleep.", "Tell me something nobody in this house knows about you.", "What's the vibe today? I'm bored."],
+  joke: ["Why did the jollof go to school? To get more flavour. Hahaha!", "If Mama Eye was a person, she'd be that auntie at every party.", "Tobi's chain is so heavy, it has its own Wi-Fi.", "They said this house has no internet. That's why everybody is connecting.", "My mother said I'd never be on TV. Mummy, look at me now!", "Mama Eye sees everything. Mama Eye, please, have you seen my slippers?"],
+  compliment: ["Your outfit today? Unmatched.", "You have the best energy in this house, honestly.", "I like how you carry yourself. Real class.", "You walk like you own this house.", "Honestly, your laugh makes this place better."],
+  deep: ["Can we talk for real? No cameras, no games.", "What made you come here? The real reason.", "Who are you when nobody is watching?", "Do you ever think about just walking out?", "What would you really do with the money?"],
+  hug: ["Come here, big hug.", "You look like you need a hug.", "Come here. You look like you've had a day."],
+  gift: ["I saved you a plate of jollof. The good part.", "Small something for you. Don't say I never did anything.", "I bought this with my hustle money. For you.", "You've been good to me. Take this."],
+  flirt: ["Has anybody told you that you look dangerous today?", "I keep finding reasons to sit next to you. Funny.", "If this house had a crush list, you'd be top.", "Stop smiling like that. You're distracting me.", "I came here for the money. Now I'm confused."],
+  askout: ["Let's stop pretending. Be my person in this house.", "I like you. For real. Let's make it official.", "I don't want to play games with you. Be mine."],
   kiss: ["Come here..."],
   breakup: ["I think we should just be friends.", "This thing between us... it's not working."],
   gist: ["Between us... {x} {claim}.", "I shouldn't tell you this, but {x} {claim}."],
   setup: ["I heard {x} talking about you. It wasn't sweet.", "You didn't hear it from me, but {x} is not your friend."],
   asksave: ["Wednesday is coming. Can I count on your save?", "If I'm in trouble, will you save me?"],
-  squad: ["You, me, and a few real ones. Let's run this house.", "Let's form a squad. We protect each other."],
-  swear: ["I swear, I've got your back. No matter what.", "Loyalty. You have mine."],
+  squad: ["You, me, and a few real ones. Let's run this house.", "Let's form a squad. We protect each other.", "I trust you. Let's watch each other's backs."],
+  swear: ["I swear, I've got your back. No matter what.", "Loyalty. You have mine.", "Whatever happens on Wednesday, I'm with you."],
   bribe: ["There's something small in it for you if you save me.", "Let's help each other. I'll make it worth your while."],
   receipt: ["I saw it with my own eyes. {x} {receipt}.", "Receipts don't lie. {x} {receipt}."],
-  shade: ["Some people in this house are all noise, no sense.", "Nice outfit. Did it come with a refund?", "Loud people are usually empty. Just saying."],
-  argue: ["You need to stop talking about me!", "I'm tired of your attitude, honestly!", "Say it to my face! Go on!"],
+  shade: ["Some people in this house are all noise, no sense.", "Nice outfit. Did it come with a refund?", "Loud people are usually empty. Just saying.", "Some people are only loud because nobody listens to them.", "That outfit is brave. Very brave."],
+  argue: ["You need to stop talking about me!", "I'm tired of your attitude, honestly!", "Say it to my face! Go on!", "I've been quiet long enough!", "Who do you think you are, talking to me like that?"],
   accuse: ["I know what you are. You're a Saboteur.", "Stop pretending. You work for The Whisper."],
-  apologize: ["I'm sorry. I was wrong.", "My bad. I shouldn't have done that."],
-  peace: ["Let's end this. Peace?", "No more wahala between us. Truce?"],
+  apologize: ["I'm sorry. I was wrong.", "My bad. I shouldn't have done that.", "I messed up. I know. I'm sorry."],
+  peace: ["Let's end this. Peace?", "No more wahala between us. Truce?", "We're both tired of this. Let's end it."],
 };
 
 function canTalk(s, t, act, a) {
@@ -91,6 +91,7 @@ function talk(s, r, a) {
     return;
   }
 
+  const cb = callbackFor(s, r, t, act);
   let score = 50;
   let romantic = false;
   const witnesses = aiIn(s).filter((w) => w.room === me.room && w.id !== t && w.act !== "sleep");
@@ -118,43 +119,47 @@ function talk(s, r, a) {
     case "apologize": score = v[F] * 0.4 + 50 - v[BF] * 0.5 + noise(); break;
     case "peace": score = 45 + v[F] * 0.3 - v[BF] * 0.3 + c.mo * 4 + noise(); break;
   }
+  if (cb && cb.tone) score += cb.tone > 0 ? 6 : act === "apologize" || act === "peace" ? -4 : -8;
   const out = outcomeOf(score);
-  const said = fill(s, r, r.pick(REPLY[act][out]), t, { x, romantic: romantic && out === "good" });
+  // A warm memory before a cold answer reads wrong; keep it for another time.
+  if (cb && ((cb.tone > 0 && out === "bad") || (cb.tone < 0 && out === "good" && act !== "apologize" && act !== "peace"))) { if (cb.ref) cb.ref.cb = false; }
+  else if (cb) lines.push({ w: t, t: cb.t, mood: cb.tone < 0 ? "angry" : cb.tone > 0 ? "happy" : "neutral", anim: cb.tone < 0 ? "wag" : cb.tone > 0 ? "happy" : "talk2" });
+  const said = fill(s, r, r.pick(replyBank(r, t, act, out)), t, { x, romantic: romantic && out === "good" });
   lines.push({ w: t, t: said });
 
   const plus = (idx, d, label) => { bump(s, t, ME, idx, d); if (label) fx.push(label); };
   switch (act) {
     case "chat": if (out === "good") { plus(F, 6, `${h.name} likes you more`); plus(TR, 3); } else if (out === "meh") plus(F, 2); else plus(F, -2, `${h.name} was not feeling it`); break;
     case "joke":
-      if (out === "good") { plus(F, 8, `${h.name} is laughing`); h.comp = clamp(h.comp + 5); me.fans = clamp(me.fans + 2); fx.push("Fans +2"); if (s.mission && s.mission.k === "laugh" && s.mission.who === t && !s.mission.done) { s.mission.n = (s.mission.n || 0) + 1; if (s.mission.n >= 2) completeMission(s, r); } for (const w of witnesses) bump(s, w.id, ME, F, 2); }
+      if (out === "good") { plus(F, 8, `${h.name} is laughing`); h.comp = clamp(h.comp + 5); remember(s, t, { k: "laughed", x: ME }); me.fans = clamp(me.fans + 2); fx.push("Fans +2"); if (s.mission && s.mission.k === "laugh" && s.mission.who === t && !s.mission.done) { s.mission.n = (s.mission.n || 0) + 1; if (s.mission.n >= 2) completeMission(s, r); } for (const w of witnesses) bump(s, w.id, ME, F, 2); }
       else if (out === "bad") plus(F, -3, "That joke flopped");
       break;
     case "compliment": if (out === "good") { plus(F, 5, `${h.name} is flattered`); plus(RO, v[AT] / 10); } else if (out === "bad") plus(TR, -3, `${h.name} thinks you want something`); break;
     case "deep":
       if (out === "good") {
-        plus(TR, 8, "They opened up to you"); plus(F, 6); me.comp = clamp(me.comp + 8);
+        plus(TR, 8, "They opened up to you"); plus(F, 6); me.comp = clamp(me.comp + 8); remember(s, t, { k: "deep", x: ME });
         if (!s.gb.some((g) => g.k === "secret" && g.about.includes(t))) addGist(s, "secret", `${h.name}'s secret: "${SECRETS[t]}"`, "secret:" + t, [t]);
       } else if (out === "meh") plus(F, 3); else plus(TR, -2, `${h.name} shut you out`);
       break;
     case "hug": if (out === "good") { plus(F, 5, "Warm hug"); h.comp = clamp(h.comp + 5); me.comp = clamp(me.comp + 3); } else if (out === "bad") plus(F, -4, `${h.name} didn't want that`); break;
-    case "gift": if (out === "good") { plus(F, 10, `${h.name} loved the gift`); plus(TR, 4); } else if (out === "meh") plus(F, 4); else plus(F, -2); if (s.mission && s.mission.k === "gift" && s.mission.who === t && !s.mission.done) completeMission(s, r); break;
+    case "gift": if (out !== "bad") remember(s, t, { k: "gift", x: ME }); if (out === "good") { plus(F, 10, `${h.name} loved the gift`); plus(TR, 4); } else if (out === "meh") plus(F, 4); else plus(F, -2); if (s.mission && s.mission.k === "gift" && s.mission.who === t && !s.mission.done) completeMission(s, r); break;
     case "flirt":
       if (out === "good") { plus(RO, 6 + v[AT] / 10, `${h.name} is blushing`); me.fans = clamp(me.fans + 2); if (rel(s, t, ME)[RO] >= 55 && rel(s, ME, t)) makeShip(s, r, ME, t, false); }
-      else if (out === "meh") plus(RO, 2); else { plus(F, -3, `${h.name} curved you`); me.comp = clamp(me.comp - 4); }
+      else if (out === "meh") plus(RO, 2); else { plus(F, -3, `${h.name} curved you`); me.comp = clamp(me.comp - 4); remember(s, t, { k: "curved", x: ME }); }
       jealousy(s, r, t, witnesses, 8);
       break;
     case "askout":
       if (out === "good") {
         const sh = makeShip(s, r, ME, t, true); plus(RO, 10, `You and ${h.name} are official! #${sh.name}`); me.fans = clamp(me.fans + 8); h.fans = clamp(h.fans + 5);
         tweet(s, r, "ship", ME, t, sh.name); jealousy(s, r, t, inHouse(s).filter((q) => !q.human), 12);
-      } else if (out === "meh") plus(RO, 2); else { plus(RO, -8, "Rejected. On camera."); plus(F, -4); me.comp = clamp(me.comp - 8); me.fans = clamp(me.fans + 2); }
+      } else if (out === "meh") plus(RO, 2); else { plus(RO, -8, "Rejected. On camera."); plus(F, -4); me.comp = clamp(me.comp - 8); me.fans = clamp(me.fans + 2); remember(s, t, { k: "curved", x: ME }); }
       break;
     case "kiss":
       if (out === "good") {
         const sh = makeShip(s, r, ME, t, true); plus(RO, 12, "The kiss of the season!"); me.fans = clamp(me.fans + 10); h.fans = clamp(h.fans + 6);
         tweet(s, r, "kiss", ME, t, sh.name); logEv(s, `${me.name} and ${h.name} kissed in the ${ROOMS[me.room].name}.`, "kiss");
         jealousy(s, r, t, inHouse(s).filter((q) => !q.human), 16);
-        for (const w of witnesses) remember(s, w.id, { k: "kiss", x: ME, y: t });
+        for (const w of witnesses) remember(s, w.id, { k: "kiss", x: ME, y: t, room: ROOMS[me.room].name.toLowerCase() });
         if (s.mission && s.mission.k === "kiss" && !s.mission.done) completeMission(s, r);
       } else if (out === "meh") plus(RO, 1, "Not here, not now");
       else { plus(F, -10, `${h.name} is not happy`); plus(TR, -10); plus(BF, 10); me.comp = clamp(me.comp - 10); me.fans = clamp(me.fans + 4); }
@@ -226,9 +231,11 @@ function talk(s, r, a) {
     case "shade":
       if (out === "good") { me.fans = clamp(me.fans + 4); plus(BF, 8, "Savage. The house is screaming."); h.comp = clamp(h.comp - 6); for (const w of witnesses) if (rel(s, w.id, t)[BF] > 20) bump(s, w.id, ME, F, 3); }
       else { plus(BF, 10, `${h.name} is ready for war`); me.fans = clamp(me.fans + 1); }
-      addBeef(s, ME, t);
+      addBeef(s, ME, t); remember(s, t, { k: "shaded", x: ME });
       break;
     case "argue":
+      remember(s, t, { k: "fight", x: ME, y: t });
+      for (const w of witnesses) remember(s, w.id, { k: "fight", x: ME, y: t, room: ROOMS[me.room].name.toLowerCase() });
       plus(BF, 12); plus(F, -8); h.comp = clamp(h.comp - 10); me.comp = clamp(me.comp - 10); me.fans = clamp(me.fans + 5);
       fx.push("Drama! Fans +5"); addBeef(s, ME, t); logEv(s, `${me.name} and ${h.name} had a heated argument.`, "fight"); tweet(s, r, "fight", ME, t);
       if (out === "good") { h.comp = clamp(h.comp - 8); fx.push(`${h.name} backed down`); }

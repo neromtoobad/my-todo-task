@@ -428,12 +428,34 @@ function checkTalk(v) {
   queue(() => playTalk(L));
 }
 
+/** Emoji a housemate pops after your move lands, by move and outcome. */
+function talkPop(act, out) {
+  if (out === "good") return { joke: "😂", flirt: "😍", askout: "💞", kiss: "💋", hug: "🤗", gift: "🥰", compliment: "😊", deep: "🥹", shade: "😂", argue: "😮‍💨", apologize: "🤝", peace: "🤝", squad: "🤝", swear: "🤝", bribe: "💰", gist: "😱", setup: "😡", receipt: "😱", accuse: "😰", breakup: "🥲" }[act] || "😊";
+  if (out === "bad") return { joke: "😑", flirt: "🙅", askout: "💔", kiss: "😠", breakup: "💔", shade: "💢", argue: "💢", accuse: "💢", bribe: "😠", gist: "🙄", setup: "🙄", hug: "✋" }[act] || "🙄";
+  return "😐";
+}
+/** How you take their answer. */
+function yourReaction(act, out) {
+  if (out === "good") return act === "joke" || act === "askout" || act === "squad" ? "cheer" : LOVE.has(act) ? "heart" : "happy";
+  if (out === "bad") return ["argue", "shade", "accuse", "setup"].includes(act) ? "angry" : LOVE.has(act) || act === "breakup" ? "sad" : "sassy";
+  return null;
+}
+const LOUD = new Set(["argue", "shade", "accuse", "kiss", "askout", "breakup"]);
+const talkCam = { pos: new THREE.Vector3(), yOff: 0, visible: true };
+
 async function playTalk(L) {
   const h = actors[L.who];
-  if (h && player.visible) {
+  const staged = h && h.visible && player.visible;
+  const prevFocus = camFocusVec, prevZoom = zoomTarget;
+  if (staged) {
     const pf = [player.pos.x, player.pos.z], hf = [h.pos.x, h.pos.z];
     player.wantFace = faceTo(pf, hf);
     if (!h.path.length && h.baseAnim !== "sleep") h.wantFace = faceTo(hf, pf);
+    // Close-up on the two of you.
+    talkCam.pos.set((pf[0] + hf[0]) / 2, 0, (pf[1] + hf[1]) / 2);
+    talkCam.yOff = ((player.yOff || 0) + (h.yOff || 0)) / 2;
+    camFocusVec = talkCam;
+    zoomTarget = Math.min(prevZoom, 3);
   }
   if (L.act === "kiss" && L.out !== "bad") audio.sfx("s_kiss", 0.7);
   else if (L.act === "gift" || L.act === "bribe") audio.sfx("s_cash", 0.6);
@@ -442,10 +464,56 @@ async function playTalk(L) {
     const l = L.lines[i];
     const mine = l.w === "you";
     const a = actorOf(l.w);
-    if (a && a.visible) a.gesture(mine ? PLAYER_MOVE[L.act] || "talk" : replyMove(L.act, L.out), 3.4);
-    await ui.line(l.w, l.t, { mood: mine ? (LOVE.has(L.act) ? "flirty" : L.out === "bad" && i > 0 ? "angry" : "neutral") : replyMood(L.act, L.out), fx: i === L.lines.length - 1 ? L.fx : null });
+    if (a && a.visible) a.gesture(l.anim || (mine ? PLAYER_MOVE[L.act] || "talk" : replyMove(L.act, L.out)), 3.4);
+    if (i === L.lines.length - 1 && !mine && staged) {
+      // The answer lands: they pop, you react, and anyone nearby turns to look.
+      pop(L.who, talkPop(L.act, L.out));
+      const mv = yourReaction(L.act, L.out);
+      if (mv) setTimeout(() => { if (player.visible && !player.path.length) player.gesture(mv, 2.4); }, 900);
+      if (LOUD.has(L.act) && L.out !== "meh") reactNearby(L.who, L.act, L.out);
+    } else if (l.mood && !mine && staged) pop(l.w, l.mood === "angry" ? "👀" : l.mood === "happy" ? "😊" : "💭");
+    await ui.line(l.w, l.t, { mood: l.mood || (mine ? (LOVE.has(L.act) ? "flirty" : L.out === "bad" && i > 0 ? "angry" : "neutral") : replyMood(L.act, L.out)), fx: i === L.lines.length - 1 ? L.fx : null });
   }
   ui.hideDialog();
+  if (staged && camFocusVec === talkCam) { camFocusVec = prevFocus; zoomTarget = prevZoom; }
+}
+
+/** Housemates near a loud moment turn and react. */
+function reactNearby(who, act, out) {
+  const v = app.view;
+  if (!v) return;
+  const t = actors[who];
+  const love = act === "kiss" || act === "askout";
+  const pool = v.hm.filter((h) => !h.out && h.id !== who && h.room === v.you.room && h.act !== "sleep" && !h.sc)
+    .map((h) => actors[h.id]).filter((a) => a && a.visible && !a.path.length && Math.hypot(a.pos.x - player.pos.x, a.pos.z - player.pos.z) < 8);
+  pool.slice(0, 4).forEach((a, i) => setTimeout(() => {
+    if (!a.visible || a.path.length) return;
+    a.wantFace = faceTo([a.pos.x, a.pos.z], [(player.pos.x + t.pos.x) / 2, (player.pos.z + t.pos.z) / 2]);
+    a.gesture(love ? (out === "good" ? "cheer" : "sassy") : i % 2 ? "wag" : "sassy", 2.8);
+    pop(a.id, love ? (out === "good" ? ["😱", "👀", "🙈"][i % 3] : "😬") : ["😮", "🍿", "👀"][i % 3]);
+  }, 400 + i * 220));
+}
+
+// ------------------------------------------------------------------ reaction pops
+const pops = [];
+function pop(id, emoji) {
+  const a = actorOf(id);
+  if (!a || !a.visible || !emoji) return;
+  const e = el("div", { class: "rpop", text: emoji });
+  tagBox.append(e);
+  pops.push({ a, e, t0: performance.now() });
+}
+function updatePops() {
+  const now = performance.now(), w = window.innerWidth, h = window.innerHeight;
+  for (let i = pops.length - 1; i >= 0; i--) {
+    const p = pops[i], k = (now - p.t0) / 1700;
+    if (k >= 1 || !p.a.visible) { p.e.remove(); pops.splice(i, 1); continue; }
+    p.a.headWorld(tmpV); tmpV.y += 0.45 + k * 0.45; tmpV.project(world.camera);
+    const x = (tmpV.x * 0.5 + 0.5) * w, y = (-tmpV.y * 0.5 + 0.5) * h;
+    const sc = k < 0.12 ? 0.5 + (k / 0.12) * 0.6 : k < 0.2 ? 1.1 - ((k - 0.12) / 0.08) * 0.1 : 1;
+    p.e.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) translate(-50%, -100%) scale(${sc.toFixed(2)})`;
+    p.e.style.opacity = k > 0.75 ? ((1 - k) / 0.25).toFixed(2) : "1";
+  }
 }
 
 function checkHeard(v) {
@@ -679,6 +747,27 @@ async function playItem(v, ev) {
   }
 }
 
+const REACT = { shock: ["sad", "wag", "sassy"], cheer: ["cheer", "happy", "wave"], sad: ["sad", "wave"], angry: ["sassy", "wag"], point: ["sassy", "wag"] };
+const REACT_POP = { shock: ["😱", "😮", "👀"], cheer: ["👏", "🎉", "🙌"], sad: ["😢", "🥺"], angry: ["😬", "🍿"], point: ["👀", "😬"] };
+let beatTok = 0;
+/** A couple of housemates react to a big moment, and the camera cuts to one of them. */
+function cutIn(b, focusA) {
+  const tok = ++beatTok;
+  if (!b.focus || !REACT[b.anim] || !focusA || stage === "here" || stage === "diary" || stage === "redroom") return;
+  const crowd = present().filter((id) => id !== b.focus && id !== "you").sort(() => Math.random() - 0.5).slice(0, 2);
+  crowd.forEach((id, i) => setTimeout(() => {
+    if (beatTok !== tok) return;
+    const a = actorOf(id); if (!a || !a.visible) return;
+    a.wantFace = faceTo([a.pos.x, a.pos.z], [focusA.pos.x, focusA.pos.z]);
+    a.gesture(REACT[b.anim][i % REACT[b.anim].length], 3);
+    pop(id, REACT_POP[b.anim][i % REACT_POP[b.anim].length]);
+  }, 700 + i * 350));
+  if (!crowd.length || (b.auto && b.auto < 3000)) return;
+  const live = () => beatTok === tok && app.view && app.view.phase === "EV";
+  setTimeout(() => { if (live()) { const a = actorOf(crowd[0]); if (a && a.visible) camFocusVec = a; } }, 1500);
+  setTimeout(() => { if (live() && focusA.visible) camFocusVec = focusA; }, 2800);
+}
+
 async function playBeat(v, ev, b) {
   if (b.stage && b.stage !== stage) await cut(() => arrange(b.stage, v, null));
   if (b.enter) enterActor(b.enter);
@@ -721,6 +810,7 @@ async function playBeat(v, ev, b) {
   if (b.reveal) audio.sfx("s_heart", 0.6);
   if (b.ledger) audio.sfx("s_cash", 0.6);
   showBoard(b, v);
+  cutIn(b, focusA && focusA.visible ? focusA : null);
   const mood = b.anim ? (b.focus && HOSTS.has(b.w) ? "neutral" : ANIM_MOOD[b.anim]) : "neutral";
   const how = await ui.line(b.w, b.t, { mood, sub: b.sub, fx: null, auto: b.auto, skippable: true });
   clearBoard();
@@ -773,11 +863,20 @@ function leaveHouse(id) {
   a.leaving = true;
   a.oneShot = null;
   audio.sfx("s_whoosh", 0.5);
+  // The house turns to see them off; they wave, then walk out through the gate.
+  const crowd = present().filter((k) => k !== id).map(actorOf).filter((o) => o && !o.path.length);
+  crowd.forEach((o, i) => {
+    o.wantFace = faceTo([o.pos.x, o.pos.z], [a.pos.x, a.pos.z]);
+    setTimeout(() => { if (o.visible && !o.path.length) o.gesture(i % 3 === 2 ? "sad" : "wave", 2.8); }, 250 + i * 140);
+  });
+  a.gesture("wave", 1.6);
+  pop(id, "👋");
   const gate = world.nearestFree(33.6, 24.5);
-  a.baseAnim = "idle";
-  a.walkTo(world, gate[0], gate[1], undefined, () => { a.visible = false; a.leaving = false; a.sync(); });
-  a.play("sad");
-  setTimeout(() => { if (a.leaving) a.play("walk"); }, 1400);
+  setTimeout(() => {
+    if (!a.leaving) return;
+    a.baseAnim = "idle";
+    a.walkTo(world, gate[0], gate[1], undefined, () => { a.visible = false; a.leaving = false; a.sync(); });
+  }, 1500);
 }
 
 function showBoard(b, v) {
@@ -1197,7 +1296,7 @@ function frame() {
   // A full-screen mini-game hides the house: don't pay to draw it.
   const covered = app.gameOn && app.gameKind !== "dance";
   if (!covered) world.render();
-  if (ready && !covered) updateTags();
+  if (ready && !covered) { updateTags(); updatePops(); }
   if (!covered) adaptQuality(dt);
 }
 
