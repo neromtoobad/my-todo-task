@@ -108,7 +108,7 @@ function canStrike(s, p, target) {
 }
 function strike(s, p, target) {
   s.dirty = true;
-  target.alive = false; target.deadAt = s.now; target.act = null;
+  target.alive = false; target.deadAt = s.now; target.act = null; target.by = p.id;
   s.bodies.push({ id: target.id, x: target.x, z: target.z, at: s.now, by: p.id });
   p.cd = s.now + s.opts.kill * 1000;
   s.stats.strikes[p.id] = (s.stats.strikes[p.id] || 0) + 1;

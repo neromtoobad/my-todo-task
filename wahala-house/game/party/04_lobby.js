@@ -84,7 +84,7 @@ function startRound(s) {
   const spots = R.shuffle(s, SPAWN);
   s.ps.forEach((p, i) => {
     p.role = sabs.has(p.id) ? "S" : "H";
-    p.alive = true; p.known = false; p.ejected = false; p.deadAt = 0;
+    p.alive = true; p.known = false; p.ejected = false; p.deadAt = 0; p.by = null;
     p.tasks = R.shuffle(s, TASK_IDS).slice(0, TASKS_EACH).map((id) => ({ id, done: false }));
     p.x = spots[i % spots.length][0]; p.z = spots[i % spots.length][1]; p.f = Math.PI; p.tp += 1; p.at = s.now;
     p.bell = 1; p.voted = null; p.act = null; p.mv = 0;

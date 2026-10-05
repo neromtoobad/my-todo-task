@@ -365,7 +365,7 @@ function startRound(s) {
   const spots = R.shuffle(s, SPAWN);
   s.ps.forEach((p, i) => {
     p.role = sabs.has(p.id) ? "S" : "H";
-    p.alive = true; p.known = false; p.ejected = false; p.deadAt = 0;
+    p.alive = true; p.known = false; p.ejected = false; p.deadAt = 0; p.by = null;
     p.tasks = R.shuffle(s, TASK_IDS).slice(0, TASKS_EACH).map((id) => ({ id, done: false }));
     p.x = spots[i % spots.length][0]; p.z = spots[i % spots.length][1]; p.f = Math.PI; p.tp += 1; p.at = s.now;
     p.bell = 1; p.voted = null; p.act = null; p.mv = 0;
@@ -507,7 +507,7 @@ function canStrike(s, p, target) {
 }
 function strike(s, p, target) {
   s.dirty = true;
-  target.alive = false; target.deadAt = s.now; target.act = null;
+  target.alive = false; target.deadAt = s.now; target.act = null; target.by = p.id;
   s.bodies.push({ id: target.id, x: target.x, z: target.z, at: s.now, by: p.id });
   p.cd = s.now + s.opts.kill * 1000;
   s.stats.strikes[p.id] = (s.stats.strikes[p.id] || 0) + 1;
@@ -591,7 +591,7 @@ const BAD = [
   "fuk", "fck", "shit", "bitch", "dick", "pussy", "asshole", "bastard", "slut", "fag", "retard", "rape", "porn",
   "ashawo", "ashewo", "olosho", "oloshi", "dickhead", "mf", "toto", "prick", "wanker", "twat", "penis", "vagina",
 ].map(collapse);
-const BAD_STEM = ["fuck", "cunt", "nigg", "fagot", "motherf", "bitch", "whore"].map(collapse);
+const BAD_STEM = ["fuck", "fck", "fuk", "phuck", "cunt", "nigg", "fagot", "motherf", "bitch", "whore"].map(collapse);
 const LEET = { "0": "o", "1": "i", "3": "e", "4": "a", "5": "s", "7": "t", "@": "a", "$": "s", "!": "i" };
 function collapse(w) { return w.replace(/(.)\1+/g, "$1"); }
 function norm(w) { return collapse(w.toLowerCase().split("").map((c) => LEET[c] || c).join("").replace(/[^a-z]/g, "")); }
@@ -687,7 +687,7 @@ function closeVote(s) {
   }
   let out = null;
   if (top && !tie && topN > skips) out = top;
-  s.res = { out, tally, skips, tie: !!tie && topN > 0, role: null, at: s.now };
+  s.res = { out, tally, skips, tie: !!tie && topN > skips, role: null, at: s.now };
   if (out) {
     const p = pOf(s, out);
     p.alive = false; p.ejected = true; p.known = true; p.deadAt = s.now; p.act = null;
@@ -1266,7 +1266,7 @@ export function viewFor(state, playerId) {
     me: {
       id: me.id, name: me.name, look: me.look, hello: me.hello, role: s.phase === "LOBBY" ? null : me.role, alive: me.alive, spec: me.spec, ghost,
       x: me.x, z: me.z, f: me.f, tp: me.tp, tasks: me.tasks, act: me.act, bell: me.bell,
-      cd: isSab(me) ? me.cd : 0, ej: me.ejected || undefined,
+      cd: isSab(me) ? me.cd : 0, ej: me.ejected || undefined, by: !me.alive && !me.ejected ? me.by : undefined,
     },
     ps,
     vis: s.phase === "PLAY" ? visionOf(s, me) : 0,

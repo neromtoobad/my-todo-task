@@ -231,7 +231,7 @@ export function viewFor(state, playerId) {
     me: {
       id: me.id, name: me.name, look: me.look, hello: me.hello, role: s.phase === "LOBBY" ? null : me.role, alive: me.alive, spec: me.spec, ghost,
       x: me.x, z: me.z, f: me.f, tp: me.tp, tasks: me.tasks, act: me.act, bell: me.bell,
-      cd: isSab(me) ? me.cd : 0, ej: me.ejected || undefined,
+      cd: isSab(me) ? me.cd : 0, ej: me.ejected || undefined, by: !me.alive && !me.ejected ? me.by : undefined,
     },
     ps,
     vis: s.phase === "PLAY" ? visionOf(s, me) : 0,

@@ -19,6 +19,14 @@ for (const [id, st] of Object.entries(I.STATIONS)) {
   if (!end || Math.hypot(end[0] - st.x, end[1] - st.z) > 0.3) { console.log("STATION UNREACHABLE", id); mapErr++; }
 }
 for (const [x, z] of I.SPAWN) if (!I.walkable(x, z)) { console.log("SPAWN NOT WALKABLE", x, z); mapErr++; }
+// The client's copy of stations and quick lines must match the server's.
+const C = await import("./app/public/js/stations.js");
+const Q = new Function(src + "; return { QUICK, ROOM_NAME };")();
+for (const [id, st] of Object.entries(I.STATIONS)) {
+  const c = C.STATIONS[id];
+  if (!c || ["kind", "label", "room", "x", "z", "game", "dur"].some((k) => c[k] !== st[k])) { console.log("CLIENT STATION DRIFT", id); mapErr++; }
+}
+if (JSON.stringify(C.QUICK) !== JSON.stringify(Q.QUICK) || JSON.stringify(C.ROOM_NAME) !== JSON.stringify(Q.ROOM_NAME)) { console.log("CLIENT QUICK/ROOM DRIFT"); mapErr++; }
 console.log("map check:", mapErr ? `${mapErr} problems` : "ok");
 
 function play(seed) {

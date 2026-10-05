@@ -31,7 +31,7 @@ const BAD = [
   "fuk", "fck", "shit", "bitch", "dick", "pussy", "asshole", "bastard", "slut", "fag", "retard", "rape", "porn",
   "ashawo", "ashewo", "olosho", "oloshi", "dickhead", "mf", "toto", "prick", "wanker", "twat", "penis", "vagina",
 ].map(collapse);
-const BAD_STEM = ["fuck", "cunt", "nigg", "fagot", "motherf", "bitch", "whore"].map(collapse);
+const BAD_STEM = ["fuck", "fck", "fuk", "phuck", "cunt", "nigg", "fagot", "motherf", "bitch", "whore"].map(collapse);
 const LEET = { "0": "o", "1": "i", "3": "e", "4": "a", "5": "s", "7": "t", "@": "a", "$": "s", "!": "i" };
 function collapse(w) { return w.replace(/(.)\1+/g, "$1"); }
 function norm(w) { return collapse(w.toLowerCase().split("").map((c) => LEET[c] || c).join("").replace(/[^a-z]/g, "")); }
@@ -127,7 +127,7 @@ function closeVote(s) {
   }
   let out = null;
   if (top && !tie && topN > skips) out = top;
-  s.res = { out, tally, skips, tie: !!tie && topN > 0, role: null, at: s.now };
+  s.res = { out, tally, skips, tie: !!tie && topN > skips, role: null, at: s.now };
   if (out) {
     const p = pOf(s, out);
     p.alive = false; p.ejected = true; p.known = true; p.deadAt = s.now; p.act = null;
