@@ -159,7 +159,7 @@ const GAMES = {
       const dt = (t - lastT) / 1000; lastT = t;
       const q = Math.max(0, 1 - Math.abs(v - target) * 4);
       [...meter.children].forEach((b, i) => b.classList.toggle("on", q > i / 5));
-      held = q > 0.88 ? held + dt : Math.max(0, held - dt * 2);
+      held = q > 0.8 ? held + dt : Math.max(0, held - dt * 2);
       progress(held / 1.2);
       if (held >= 1.2) { win(); return; }
       raf = requestAnimationFrame(loop);
@@ -172,17 +172,18 @@ const GAMES = {
     const core = el("div", { class: "core", text: st.icon });
     const ring = el("div", { class: "ring" });
     area.append(core, ring);
-    let hits = 0, t0 = performance.now(), raf = 0, scale = 2.4;
+    let hits = 0, t0 = performance.now(), raf = 0;
+    // Timed by the clock, so a slow phone judges the tap fairly.
+    const scaleAt = (t) => 2.4 - (((t - t0) % 1300) / 1300) * 1.9;
+    area.dataset.t0 = t0;
     const loop = (t) => {
-      const k = ((t - t0) % 1300) / 1300;
-      scale = 2.4 - k * 1.9;
-      ring.style.transform = `translate(-50%, -50%) scale(${scale})`;
+      ring.style.transform = `translate(-50%, -50%) scale(${scaleAt(t)})`;
       raf = requestAnimationFrame(loop);
     };
     raf = requestAnimationFrame(loop);
     area.addEventListener("pointerdown", (e) => {
       e.preventDefault();
-      if (Math.abs(scale - 1) < 0.22) { hits += 1; core.classList.remove("hit"); void core.offsetWidth; core.classList.add("hit"); audio.sfx("s_whoosh", 0.3); progress(hits / 4); t0 = performance.now(); if (hits >= 4) win(); }
+      if (Math.abs(scaleAt(performance.now()) - 1) < 0.22) { hits += 1; core.classList.remove("hit"); void core.offsetWidth; core.classList.add("hit"); audio.sfx("s_whoosh", 0.3); progress(hits / 4); t0 = performance.now(); area.dataset.t0 = t0; if (hits >= 4) win(); }
       else { area.classList.remove("shake"); void area.offsetWidth; area.classList.add("shake"); }
     });
     return () => cancelAnimationFrame(raf);
@@ -193,18 +194,19 @@ const GAMES = {
     const btn = el("button", { class: "holdbtn", type: "button", text: `HOLD ${st.icon}` });
     area.append(gauge, btn);
     const fill = gauge.querySelector(".fill");
-    let v = 0, holding = false, raf = 0, lastT = performance.now();
-    const loop = (t) => {
-      const dt = (t - lastT) / 1000; lastT = t;
-      if (holding) v += dt / 1.7;
-      if (v > 1) { v = 0; holding = false; area.classList.remove("shake"); void area.offsetWidth; area.classList.add("shake"); }
-      fill.style.height = v * 100 + "%";
+    // The gauge is the time held, read from the clock, so a slow phone is still fair.
+    let v = 0, holding = false, since = 0, raf = 0;
+    const level = () => (holding ? (performance.now() - since) / 1700 : v);
+    const loop = () => {
+      if (holding && level() > 1) { holding = false; v = 0; area.classList.remove("shake"); void area.offsetWidth; area.classList.add("shake"); }
+      fill.style.height = Math.min(1, level()) * 100 + "%";
       raf = requestAnimationFrame(loop);
     };
     raf = requestAnimationFrame(loop);
-    btn.addEventListener("pointerdown", (e) => { e.preventDefault(); holding = true; btn.setPointerCapture(e.pointerId); });
+    btn.addEventListener("pointerdown", (e) => { e.preventDefault(); holding = true; since = performance.now(); btn.setPointerCapture(e.pointerId); });
     const release = () => {
       if (!holding) return;
+      v = level();
       holding = false;
       if (v >= 0.72 && v <= 0.95) { progress(1); win(); } else { v = 0; progress(0); }
     };

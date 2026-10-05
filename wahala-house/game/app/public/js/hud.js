@@ -243,12 +243,14 @@ export class Hud {
         el("div", { class: "alarm", hidden: true }),
         el("div", { class: "ghostnote", hidden: true }),
         el("div", { class: "acts" },
-          el("button", { class: "act use", type: "button", "data-a": "use", onclick: () => on.act("use") }, el("i", { text: "✋" }), el("b", { text: "USE" })),
-          el("button", { class: "act report", type: "button", "data-a": "report", onclick: () => on.act("report") }, el("i", { text: "📢" }), el("b", { text: "REPORT" })),
-          el("button", { class: "act bell", type: "button", "data-a": "bell", onclick: () => on.act("bell") }, el("i", { text: "🔔" }), el("b", { text: "BELL" })),
-          el("button", { class: "act sab", type: "button", "data-a": "sab", onclick: () => on.act("sab") }, el("i", { text: "💥" }), el("b", { text: "SABOTAGE" }), el("em")),
-          el("button", { class: "act strike", type: "button", "data-a": "strike", onclick: () => on.act("strike") }, el("i", { text: "🔪" }), el("b", { text: "STRIKE" }), el("em"))));
+          el("button", { class: "act use", type: "button", hidden: true, "data-a": "use", onclick: () => on.act("use") }, el("i", { text: "✋" }), el("b", { text: "USE" })),
+          el("button", { class: "act report", type: "button", hidden: true, "data-a": "report", onclick: () => on.act("report") }, el("i", { text: "📢" }), el("b", { text: "REPORT" })),
+          el("button", { class: "act bell", type: "button", hidden: true, "data-a": "bell", onclick: () => on.act("bell") }, el("i", { text: "🔔" }), el("b", { text: "BELL" })),
+          el("button", { class: "act sab", type: "button", hidden: true, "data-a": "sab", onclick: () => on.act("sab") }, el("i", { text: "💥" }), el("b", { text: "SABOTAGE" }), el("em")),
+          el("button", { class: "act strike", type: "button", hidden: true, "data-a": "strike", onclick: () => on.act("strike") }, el("i", { text: "🔪" }), el("b", { text: "STRIKE" }), el("em"))));
       this.root.append(box);
+      // A fresh HUD (after a meeting) must redraw everything it caches.
+      this.k = {};
     }
     const me = v.me;
     box.querySelector(".bar i").style.width = Math.round(v.bar * 100) + "%";
@@ -295,6 +297,8 @@ export class Hud {
       const a = st[b.dataset.a];
       b.hidden = !a || a.hidden;
       if (b.hidden) continue;
+      // Out-of-range buttons keep their slot so the others never jump under a thumb.
+      b.classList.toggle("away", !!a.away);
       b.disabled = !a.on;
       const em = b.querySelector("em");
       if (em) em.textContent = a.secs ? String(a.secs) : "";
@@ -361,6 +365,8 @@ export class Hud {
       input.addEventListener("keydown", (e) => { if (e.key === "Enter") send(); e.stopPropagation(); });
       this.lastChat = 0;
       this.pick = null;
+      // A second meeting can look identical to the last one; redraw it all.
+      this.k = {};
       audio.sfx("s_gasp", 0.6);
     }
     const m = v.meet || {};

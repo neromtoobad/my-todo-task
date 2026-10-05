@@ -395,9 +395,9 @@ function actionState() {
   const out = {};
   out.use = { on: !!st && !chore, hidden: false, label: st ? (STATIONS[st].kind === "fix" ? "FIX" : "USE") : "USE" };
   if (me.alive) {
-    out.report = { on: !!nearestBody(v, x, z), hidden: !nearestBody(v, x, z) };
+    out.report = { on: !!nearestBody(v, x, z), away: !nearestBody(v, x, z) };
     const nearBell = Math.hypot(STATIONS.bell.x - x, STATIONS.bell.z - z) <= RANGE.bell;
-    out.bell = { on: nearBell && me.bell > 0 && now >= v.bellAt && !v.sab, hidden: !nearBell, secs: nearBell && now < v.bellAt ? Math.ceil((v.bellAt - now) / 1000) : 0 };
+    out.bell = { on: nearBell && me.bell > 0 && now >= v.bellAt && !v.sab, away: !nearBell, secs: nearBell && now < v.bellAt ? Math.ceil((v.bellAt - now) / 1000) : 0 };
   }
   if (me.role === "S" && me.alive) {
     const t = strikeTarget(v, x, z);
@@ -740,15 +740,17 @@ function frame() {
     movePlayer(mdt);
     moveOthers(mdt);
     for (const a of Object.values(actors)) if (a.visible || a.path.length) a.update(dt, now);
-    hudT += dt;
+    // Real time, so slow devices still refresh the HUD ten times a second.
+    hudT += Math.min(0.5, raw);
     if (hudT > 0.1) {
       hudT = 0;
-      hud.actions(actionState());
       const v = app.view;
       if (v && v.phase === "LOBBY") hud.lobby(v, lobbyOn);
       else if (v && (v.phase === "MEET" || v.phase === "VOTE")) hud.meeting(v, meetOn);
       else if (v && v.phase === "PLAY") hud.play(v, playOn);
       else if (v && v.phase === "END") hud.endTimer(v);
+      // After the screen is drawn, so a fresh HUD never flashes every button.
+      hud.actions(actionState());
     }
   }
   updateCamera(dt);
