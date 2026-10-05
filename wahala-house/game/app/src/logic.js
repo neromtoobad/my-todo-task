@@ -1,3364 +1,1292 @@
 /**
- * WAHALA HOUSE - Week One.
+ * WAHALA HOUSE: Party Mode.
  *
- * A single-player social strategy season: the human is one housemate among
- * ten AI housemates in a Lagos mansion. Two housemates are secret Saboteurs.
- * Relationships (friendship, romance, trust, beef), composure, fans, gist,
- * lies, strikes, nominations, a wager task, a party and a live eviction show
- * all run here. The browser only renders what viewFor() returns.
+ * Five to ten players share the house. One or two of them are secret
+ * Saboteurs. Housemates do chores to fill the task bar; Saboteurs fake chores,
+ * strike housemates who are alone with them and sabotage the house. A body or
+ * the emergency bell calls a House Meeting: everyone talks, then votes someone
+ * out. AI housemates fill empty seats and take over for anyone who drops.
  *
  * Contract: six pure exports, no imports, no timers, no Math.random or
- * Date.now. Randomness is a seeded generator stored in state.
+ * Date.now. The room injects the server clock as `action._now` and drives time
+ * with `{t:"_tick"}` system actions; randomness is a seeded generator in state.
  */
 
-export const meta = { game: "Wahala House", minPlayers: 1, maxPlayers: 1 };
+export const meta = { game: "Wahala House", minPlayers: 1, maxPlayers: 10 };
 
 // ---------------------------------------------------------------------------
-// Cast
+// Timings (ms) and tuning
 // ---------------------------------------------------------------------------
 
-/**
- * Stats are 0-5. fl flirt, ld loud, tp temper, ly loyal, sc scheme,
- * wt wit, mo moral, jl jealous, ob observe. Skills: ck cook, bz business,
- * dn dance. home: room weights by block [morning, afternoon, evening].
- */
-const CAST = [
-  { id: "tobi", name: "Tobi", nick: "Odogwu", full: "Tobi Balogun", g: "m", age: 27, from: "Lagos Island", job: "Club promoter",
-    fl: 5, ld: 5, tp: 3, ly: 2, sc: 2, wt: 3, mo: 2, jl: 3, ob: 2, ck: 2, bz: 3, dn: 5, fans: 58,
-    traits: ["Flirty", "Clout-chaser", "Loud"], sig: "Odogwu don land! Who dey vex?",
-    ex: ["Omo!", "Chai!", "Odogwu!"], pet: ["my guy", "boss"], petR: ["baby girl", "fine girl"], tell: "says 'trust me' twice",
-    home: [{ gym: 3, kitchen: 2, garden: 2 }, { garden: 4, lounge: 2 }, { lounge: 3, garden: 3 }] },
-  { id: "ada", name: "Ada", nick: "Ada Ada", full: "Adaeze Nwosu", g: "f", age: 25, from: "Enugu", job: "Skit-maker",
-    fl: 2, ld: 4, tp: 2, ly: 2, sc: 3, wt: 5, mo: 2, jl: 2, ob: 4, ck: 2, bz: 2, dn: 4, fans: 55,
-    traits: ["Funny", "Messy"], sig: "I no talk anything o... but make I tell you something.",
-    ex: ["Ehen!", "Nne!", "Chineke!"], pet: ["my dear", "nne"], petR: ["my crush", "fine boy"], tell: "laughs too loud",
-    home: [{ kitchen: 3, lounge: 2 }, { lounge: 4, garden: 2 }, { lounge: 4, kitchen: 2 }] },
-  { id: "musa", name: "Musa", nick: "Musa", full: "Musa Abdullahi", g: "m", age: 29, from: "Kaduna", job: "Architect",
-    fl: 2, ld: 1, tp: 1, ly: 5, sc: 2, wt: 2, mo: 4, jl: 1, ob: 4, ck: 3, bz: 3, dn: 2, fans: 42,
-    traits: ["Loyal", "Calm", "Romantic"], sig: "Patience. Everything reveals itself.",
-    ex: ["Hmm.", "Wallahi.", "Ah."], pet: ["my friend", "brother"], petR: ["my dear", "habibti"], tell: "goes very quiet",
-    home: [{ garden: 3, gym: 2 }, { garden: 3, lounge: 2 }, { kitchen: 2, garden: 3 }] },
-  { id: "ivie", name: "Ivie", nick: "Ivie", full: "Ivie Osagie", g: "f", age: 24, from: "Benin City", job: "Fashion designer",
-    fl: 5, ld: 3, tp: 2, ly: 2, sc: 4, wt: 3, mo: 2, jl: 3, ob: 3, ck: 1, bz: 4, dn: 4, fans: 56,
-    traits: ["Flirty", "Strategic"], sig: "If you can't handle this energy, step aside.",
-    ex: ["Ehn ehn.", "Darling!", "Oya!"], pet: ["darling", "babe"], petR: ["handsome", "my love"], tell: "touches her braids",
-    home: [{ bedroom: 3, garden: 2 }, { garden: 5 }, { garden: 3, lounge: 3 }] },
-  { id: "kunle", name: "Kunle", nick: "Pastor K", full: "Kunle Adeyemi", g: "m", age: 26, from: "Ibadan", job: "Gospel singer",
-    fl: 2, ld: 2, tp: 2, ly: 3, sc: 2, wt: 2, mo: 5, jl: 5, ob: 3, ck: 2, bz: 2, dn: 3, fans: 47,
-    traits: ["Moral", "Jealous"], sig: "God is watching. And so am I.",
-    ex: ["Jesu!", "Ah ah!", "Haba!"], pet: ["my brother", "my sister"], petR: ["sister mi", "my queen"], tell: "quotes scripture",
-    home: [{ bedroom: 4, kitchen: 1 }, { lounge: 3, bedroom: 2 }, { lounge: 3, garden: 2 }] },
-  { id: "ebi", name: "Ebi", nick: "Ebi", full: "Ebiere Pepple", g: "f", age: 28, from: "Port Harcourt", job: "Oil and gas engineer",
-    fl: 1, ld: 4, tp: 5, ly: 5, sc: 1, wt: 2, mo: 4, jl: 2, ob: 3, ck: 3, bz: 3, dn: 3, fans: 50,
-    traits: ["Hot-tempered", "Loyal"], sig: "Try me. I dare you. Try me.",
-    ex: ["Tufiakwa!", "Abeg!", "See me see trouble!"], pet: ["abeg", "my person"], petR: ["my guy", "sweet boy"], tell: "folds her arms",
-    home: [{ gym: 5 }, { gym: 2, garden: 2, kitchen: 2 }, { kitchen: 3, lounge: 2 }] },
-  { id: "nedu", name: "Nedu", nick: "Nedu Codes", full: "Chinedu Okoro", g: "m", age: 30, from: "Yaba", job: "Fintech founder",
-    fl: 2, ld: 2, tp: 1, ly: 2, sc: 5, wt: 3, mo: 2, jl: 1, ob: 5, ck: 1, bz: 5, dn: 1, fans: 45,
-    traits: ["Strategic", "Calm", "Shady"], sig: "Everybody has a price. Even you.",
-    ex: ["Interesting.", "Omo.", "See ehn."], pet: ["boss", "my G"], petR: ["beautiful", "my person"], tell: "adjusts his glasses",
-    home: [{ kitchen: 2, lounge: 3 }, { lounge: 4 }, { lounge: 3, garden: 2 }] },
-  { id: "nkoyo", name: "Nkoyo", nick: "Mama Nkoyo", full: "Nkoyo Effiong", g: "f", age: 31, from: "Calabar", job: "Chef and caterer",
-    fl: 1, ld: 2, tp: 2, ly: 4, sc: 1, wt: 3, mo: 4, jl: 1, ob: 5, ck: 5, bz: 3, dn: 3, fans: 48,
-    traits: ["Nurturing", "Observant"], sig: "Sit down, eat first. Then talk.",
-    ex: ["Eh heh!", "My God!", "Nawa o!"], pet: ["my pikin", "my dear"], petR: ["my darling", "sweetheart"], tell: "starts cooking",
-    home: [{ kitchen: 6 }, { kitchen: 3, lounge: 2 }, { kitchen: 5, lounge: 1 }] },
-  { id: "zee", name: "Zee", nick: "Zee", full: "Zainab Bello", g: "f", age: 23, from: "Abuja", job: "Law graduate",
-    fl: 3, ld: 3, tp: 3, ly: 2, sc: 4, wt: 4, mo: 2, jl: 3, ob: 4, ck: 2, bz: 4, dn: 3, fans: 52,
-    traits: ["Competitive", "Shady"], sig: "I'm not rude. I'm just correct.",
-    ex: ["Excuse me?", "Wow.", "Kai!"], pet: ["babe", "sis"], petR: ["cutie", "handsome"], tell: "over-explains",
-    home: [{ bedroom: 2, gym: 2 }, { garden: 4, lounge: 1 }, { lounge: 2, garden: 3 }] },
-  { id: "mekus", name: "Mekus", nick: "Mekus", full: "Emeka Okafor", g: "m", age: 32, from: "Onitsha", job: "Trader",
-    fl: 3, ld: 4, tp: 2, ly: 3, sc: 3, wt: 5, mo: 3, jl: 2, ob: 3, ck: 3, bz: 5, dn: 3, fans: 50,
-    traits: ["Hustler", "Funny"], sig: "When money speaks, truth keeps quiet.",
-    ex: ["Nwanne!", "Ahn ahn!", "Hear me!"], pet: ["my brother", "nwanne"], petR: ["my sugar", "ada eze"], tell: "tells a proverb",
-    home: [{ kitchen: 3, lounge: 2 }, { lounge: 3, garden: 2 }, { kitchen: 2, lounge: 3 }] },
-];
-const BY = {};
-for (const c of CAST) BY[c.id] = c;
-const AI_IDS = CAST.map((c) => c.id);
-const ME = "you";
-
-/** Built-in history: [a, b, friendship, romance, trust, beef], applied both ways. */
-const HISTORY = [
-  ["tobi", "ivie", 30, 38, 20, 22],
-  ["ada", "zee", 10, 0, 10, 46],
-  ["nkoyo", "musa", 62, 0, 60, 0],
-  ["nedu", "mekus", 28, 0, 18, 32],
-  ["ebi", "nkoyo", 50, 0, 45, 0],
-  ["kunle", "ada", 40, 10, 35, 0],
-];
-
-// ---------------------------------------------------------------------------
-// House
-// ---------------------------------------------------------------------------
-
-/** spots: how many standing/sitting positions the client lays out per room. */
-const ROOMS = {
-  lounge: { name: "Lounge", spots: 8 },
-  kitchen: { name: "Kitchen", spots: 6 },
-  garden: { name: "Garden & Pool", spots: 10 },
-  bedroom: { name: "Bedroom", spots: 12 },
-  gym: { name: "Gym Corner", spots: 3 },
-  hoh: { name: "HoH Lounge", spots: 4 },
-  diary: { name: "Diary Room", spots: 1 },
-  arena: { name: "Arena", spots: 12 },
-  redroom: { name: "Red Room", spots: 3 },
+const T = {
+  intro: 6500,
+  firstKill: 12000,
+  sabFirst: 15000,
+  sabCd: 30000,
+  gas: 40000,
+  bellLock: 15000,
+  result: 7500,
+  fill: 30000,
+  fillFull: 3000,
+  away: 15000,
+  endBack: 25000,
+  taskSlack: 0.75,
 };
-const ROAM_ROOMS = ["lounge", "kitchen", "garden", "bedroom", "gym", "hoh"];
+const SPEED = { walk: 2.6, maxHuman: 6, slack: 1.2 };
+const RANGE = { strike: 1.9, report: 2.6, use: 2.3, bell: 2.3 };
+const VISION = { H: 6.5, S: 7.5, nepa: 2.6, close: 3.2 };
+const OPTS_DEFAULT = { fill: 8, sabs: 0, kill: 40, discuss: 40, vote: 25, reveal: true };
+const OPTS_ALLOWED = { fill: [5, 6, 7, 8, 9, 10], sabs: [0, 1, 2, 3], kill: [20, 25, 30, 35, 40, 50], discuss: [20, 30, 40, 60, 90], vote: [15, 20, 25, 30, 45], reveal: [true, false] };
 
-const DAYS = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"];
-const DAY_START = 480; // 08:00
-const DAY_END = 1560; // 02:00 next day
-const TICK = 10; // game minutes per tick
-
-/** Scheduled events per day: [minute, kind]. */
-const SCHEDULE = {
-  0: [[1500, "night"]],
-  1: [[660, "hoh"], [1500, "night"]],
-  2: [[600, "wager"], [900, "diary"], [1500, "night"]],
-  3: [[840, "noms"], [1200, "nomreveal"], [1500, "night"]],
-  4: [[600, "veto"], [780, "hustle"], [1500, "night"]],
-  5: [[660, "wresult"], [1440, "strike"]],
-  6: [[480, "strikereveal"], [1260, "party"], [1500, "night"]],
-  7: [[1140, "live"]],
+/** Character looks a seat can wear: the ten housemates plus the two player models. */
+const LOOKS = ["tobi", "ada", "musa", "ivie", "kunle", "ebi", "nedu", "nkoyo", "zee", "mekus", "pf", "pm"];
+const CAST = {
+  tobi: { name: "Tobi", ex: ["Omo!", "Chai!", "Odogwu!"] },
+  ada: { name: "Ada", ex: ["Ehen!", "Nne!", "Chineke!"] },
+  musa: { name: "Musa", ex: ["Hmm.", "Wallahi.", "Ah."] },
+  ivie: { name: "Ivie", ex: ["Ehn ehn.", "Darling!", "Oya!"] },
+  kunle: { name: "Kunle", ex: ["Jesu!", "Ah ah!", "Haba!"] },
+  ebi: { name: "Ebi", ex: ["Tufiakwa!", "Abeg!", "See me see trouble!"] },
+  nedu: { name: "Nedu", ex: ["Interesting.", "Omo.", "See ehn."] },
+  nkoyo: { name: "Nkoyo", ex: ["Eh heh!", "My God!", "Nawa o!"] },
+  zee: { name: "Zee", ex: ["Excuse me?", "Wow.", "Kai!"] },
+  mekus: { name: "Mekus", ex: ["Nwanne!", "Ahn ahn!", "Hear me!"] },
+  pf: { name: "Housemate", ex: ["Omo!", "Ehen!"] },
+  pm: { name: "Housemate", ex: ["Omo!", "Chai!"] },
 };
+const BOT_ORDER = ["tobi", "ada", "musa", "ivie", "kunle", "ebi", "nedu", "nkoyo", "zee", "mekus"];
 
 // ---------------------------------------------------------------------------
-// Player actions (interaction wheel)
+// Seeded randomness (mulberry32 over a uint32 kept in state)
 // ---------------------------------------------------------------------------
 
-/** e: energy cost. need: requirement key checked in canDo(). x: needs a third person. */
-const ACTS = {
-  chat: { g: "VIBE", label: "Chit-chat", e: 1 },
-  joke: { g: "VIBE", label: "Joke", e: 1 },
-  compliment: { g: "VIBE", label: "Compliment", e: 1 },
-  deep: { g: "VIBE", label: "Deep Talk", e: 2 },
-  hug: { g: "VIBE", label: "Hug", e: 1 },
-  gift: { g: "VIBE", label: "Give Gift", e: 1, coins: 60 },
-  flirt: { g: "LOVE", label: "Flirt", e: 1 },
-  askout: { g: "LOVE", label: "Ask Out", e: 2 },
-  kiss: { g: "LOVE", label: "Kiss", e: 2 },
-  breakup: { g: "LOVE", label: "Break Up", e: 1 },
-  gist: { g: "SCHEME", label: "Spread Gist", e: 2, x: true },
-  setup: { g: "SCHEME", label: "Set Up", e: 3, x: true },
-  asksave: { g: "SCHEME", label: "Ask For Your Save", e: 1 },
-  squad: { g: "SCHEME", label: "Propose Squad", e: 2 },
-  swear: { g: "SCHEME", label: "Swear Loyalty", e: 1 },
-  bribe: { g: "SCHEME", label: "Bribe", e: 1, coins: 120 },
-  receipt: { g: "SCHEME", label: "Share a Receipt", e: 2, x: true },
-  shade: { g: "CONFRONT", label: "Throw Shade", e: 1 },
-  argue: { g: "CONFRONT", label: "Argue", e: 2 },
-  accuse: { g: "CONFRONT", label: "Accuse: Saboteur", e: 2 },
-  apologize: { g: "CONFRONT", label: "Apologize", e: 1 },
-  peace: { g: "CONFRONT", label: "Make Peace", e: 2 },
+function rnd(s) {
+  s.rng = (s.rng + 0x6d2b79f5) >>> 0;
+  let t = s.rng;
+  t = Math.imul(t ^ (t >>> 15), t | 1);
+  t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+}
+const R = {
+  int: (s, n) => Math.floor(rnd(s) * n),
+  pick: (s, a) => a[Math.floor(rnd(s) * a.length)],
+  chance: (s, p) => rnd(s) < p,
+  range: (s, a, b) => a + rnd(s) * (b - a),
+  shuffle: (s, a) => { const b = a.slice(); for (let i = b.length - 1; i > 0; i--) { const j = Math.floor(rnd(s) * (i + 1)); [b[i], b[j]] = [b[j], b[i]]; } return b; },
 };
-
-/** Claims the player can make with Spread Gist. */
-const CLAIMS = {
-  likes: "has a crush on you",
-  hates: "has been talking bad about you",
-  fake: "is fake and playing everybody",
-  sab: "is a Saboteur",
-  using: "is only using you for the game",
-};
-
-// ---------------------------------------------------------------------------
-// Voices of the show
-// ---------------------------------------------------------------------------
-
-const EYE = "Mama Eye";
-const WHISPER = "The Whisper";
-const DAPO = "Dapo Kalu";
-
-const FEED_HANDLES = ["@lagosgist", "@wahalawatch", "@naijatea", "@house_stan", "@eyeseeall", "@jollofqueen", "@abujababe", "@phbossman", "@yabatechbro", "@ibadansoul", "@shipperNG", "@teatimeng"];
-// ---------------------------------------------------------------------------
-// Dialogue banks. Placeholders: {ex} exclamation, {pet} term of address,
-// {you} player name, {x} third person, {me} speaker name.
-// ---------------------------------------------------------------------------
-
-/** Housemate replies to the player, by action then outcome (good / meh / bad). */
-const REPLY = {
-  chat: {
-    good: ["{ex} {you}, you get sense sha. I like this gist.", "See, you're easy to talk to. Stay here small.", "Ahn ahn, {pet}, where have you been hiding this personality?", "Honestly? You're one of the real ones in this house."],
-    meh: ["Mm. Okay. Nice talk.", "Yeah, yeah. The weather is weather.", "We move, {pet}.", "Cool. I'm just here, vibing."],
-    bad: ["I'm not really in the mood, abeg.", "Is this conversation going somewhere?", "{ex} You again?", "Talk to me later. Much later."],
-  },
-  joke: {
-    good: ["{ex} Stop! My stomach! Hahaha!", "You're mad! Who taught you this one?", "Omo, you need your own show. I'm crying!", "Hahaha! Okay okay, you win today."],
-    meh: ["Heh. Small laugh. Very small.", "I see what you tried there.", "Keep practising, {pet}.", "That one needed more pepper."],
-    bad: ["Was that a joke? I'm asking seriously.", "Not funny. At all.", "You're not a comedian, abeg.", "Please, stick to your day job."],
-  },
-  compliment: {
-    good: ["Awww, {pet}. You just made my whole day.", "{ex} You noticed? Finally, somebody with eyes.", "Stop it! Okay, say it one more time.", "See why I like you? Correct person."],
-    meh: ["Thank you. I know.", "Okay... thanks?", "Mm. Noted.", "That's sweet. I guess."],
-    bad: ["What do you want from me?", "Flattery won't save you on Wednesday.", "Hmm. Suspicious.", "I don't trust sweet mouth."],
-  },
-  deep: {
-    good: ["Can I tell you something real? {secret}", "Nobody in this house knows this, but... {secret}", "I trust you, so listen. {secret}", "Promise me this stays between us. {secret}"],
-    meh: ["It's been a long week already. That's all.", "I miss home. That's the real gist.", "Some days it's too much, you know?", "I'm fine. I'm fine. Really."],
-    bad: ["Deep talk? With you? Not today.", "My business is my business.", "You want my secrets so you can use them? No.", "I don't know you like that."],
-  },
-  hug: {
-    good: ["Come here! Big hug!", "{ex} This one is a warm hug. I needed it.", "Aww. Okay, don't let go yet.", "Hug accepted. You're family now."],
-    meh: ["Okay, small hug.", "Alright, alright.", "Side hug. That's all.", "Mm. Thanks."],
-    bad: ["Abeg, personal space.", "Don't touch me like that.", "Hug ke? We're not there yet.", "Back up small."],
-  },
-  gift: {
-    good: ["For me? {ex} You're the best!", "This is why I rate you. You're thoughtful.", "Jollof? You know my love language!", "I'm keeping this. And I'm keeping you."],
-    meh: ["Oh. Thanks.", "Okay, I'll take it.", "Nice. Thank you.", "Appreciated, {pet}."],
-    bad: ["You think you can buy me?", "Keep your gift.", "What's the catch?", "I don't collect bribes, abeg."],
-  },
-  flirt: {
-    good: ["{ex} You're dangerous, you know that?", "Keep talking like that and see what happens.", "Is it hot in here or is it just you?", "Hmm, {pet}. I see you."],
-    meh: ["Haha. Cute.", "Nice try. Try again later.", "You're sweet. That's all I'll say.", "Mm. Maybe."],
-    bad: ["Abeg, it's not that kind of party.", "Let's just be friends, okay?", "Please redirect that energy.", "I'm going to pretend I didn't hear that."],
-  },
-  askout: {
-    good: ["Yes! Oya, it's official. Tell the whole house!", "{ex} I was waiting for you to ask!", "Yes, {pet}. You and me. Let them talk.", "Finally! Yes!"],
-    meh: ["Let's take it slow first.", "Ask me again after Sunday.", "I like you, but not yet.", "Hmm. Give me time."],
-    bad: ["Ehn? No. Just no.", "We're not on that level.", "I think you misread things.", "Sorry, my heart is elsewhere."],
-  },
-  kiss: {
-    good: ["...Wow.", "{ex} The cameras definitely caught that.", "Do that again. Slowly.", "Okay. Okay. I'm blushing."],
-    meh: ["Easy, easy. Not in front of everybody.", "Maybe later. When it's quiet.", "Not here, {pet}.", "Slow down small."],
-    bad: ["Whoa! No!", "Don't ever try that again.", "Are you okay?", "Mama Eye, are you seeing this?"],
-  },
-  breakup: {
-    good: ["Fine. Maybe it's better this way.", "I understand. No hard feelings.", "Okay. We stay friends.", "It was fun while it lasted."],
-    meh: ["Wow. Okay.", "If that's what you want.", "I didn't see this coming.", "Hmm. Noted."],
-    bad: ["You're breaking up with ME? On camera?", "After everything? {ex}", "You'll regret this. Watch.", "Nigeria will judge you!"],
-  },
-  gist: {
-    good: ["{ex} {x}?! I knew something was off!", "Wait wait wait. {x} did that? I'm watching them now.", "Thank you for telling me. I owe you.", "So {x} is like that? Okay. Noted."],
-    meh: ["Hmm. I'll think about it.", "Maybe. Maybe not.", "You sure about this?", "Let me find out for myself."],
-    bad: ["You're lying. {x} would never.", "Why are you always carrying gist?", "Stop trying to cause wahala.", "I don't believe you. At all."],
-  },
-  setup: {
-    good: ["{x} said WHAT about me?! Where is {x}?", "{ex} So {x} is a snake. Thank you for telling me.", "Okay. {x} and I are going to talk. Loudly.", "I knew it. I knew {x} was fake."],
-    meh: ["Hmm. That doesn't sound like {x}.", "I'll ask {x} myself.", "Maybe you heard wrong.", "Let me verify first."],
-    bad: ["You're trying to set me against {x}. I see you.", "Nice try. I'm not stupid.", "I'll tell {x} you said this.", "Why do you want us to fight?"],
-  },
-  asksave: {
-    good: ["You're safe with me. My save is yours.", "Don't worry, {pet}. I've got you on Wednesday.", "Consider it done.", "I was already planning to save you."],
-    meh: ["I'll see how the week goes.", "Maybe. Show me you're worth it.", "I can't promise anything.", "Let me think about it."],
-    bad: ["Save you? You never even greeted me this week.", "My saves are already taken.", "No, sorry.", "Ask somebody else."],
-  },
-  squad: {
-    good: ["Squad! We run this house now!", "Say less. We move together.", "{ex} Finally, an alliance with sense.", "I'm in. Loyalty till the end."],
-    meh: ["Let me see how you move first.", "Squad is a big word.", "Maybe after nominations.", "I'll think about it."],
-    bad: ["I don't do squads with strangers.", "You want to use me? No.", "Not interested.", "Find another squad."],
-  },
-  swear: {
-    good: ["I swear it back. Loyalty.", "I believe you. Don't disappoint me.", "Handshake? Deal.", "That means a lot, {pet}."],
-    meh: ["Words are cheap in this house.", "We'll see.", "Okay. Time will tell.", "Mm hm."],
-    bad: ["Everybody swears. Everybody lies.", "I don't believe you.", "Save your oaths.", "Loyalty ke? This house?"],
-  },
-  bribe: {
-    good: ["Money talks. I'm listening.", "{ex} Okay, you're serious. Deal.", "Pleasure doing business.", "This one will stay between us."],
-    meh: ["I'll take it, but no promises.", "Hmm. We'll see.", "Thanks. We'll talk.", "Okay. Small small."],
-    bad: ["You want to buy my vote? Shame!", "Keep your money.", "I'm reporting this to Mama Eye.", "I'm not for sale."],
-  },
-  receipt: {
-    good: ["{ex} You saw this with your own eyes?", "Receipts don't lie. {x} is finished.", "This is proof. I'm watching {x} now.", "Thank you. Now I know."],
-    meh: ["Interesting. But it could mean anything.", "Hmm. I'll keep it in mind.", "That's something.", "Okay."],
-    bad: ["That proves nothing.", "You're twisting things.", "Leave {x} alone.", "I don't care."],
-  },
-  shade: {
-    good: ["Hahaha! You're wicked! I'm dead!", "{ex} Savage!", "The shade! The shade!", "Somebody bring water!"],
-    meh: ["Was that shade? Weak shade.", "Okay, noted.", "Mm hm.", "Cute."],
-    bad: ["Say it with your full chest!", "Who are you throwing shade at?", "Watch your mouth.", "{ex} You don't know me."],
-  },
-  argue: {
-    good: ["Fine! Maybe you have a point!", "Okay, okay! I hear you!", "You win this one.", "Calm down, I understand now."],
-    meh: ["Whatever!", "This is going nowhere!", "Talk to my hand!", "I'm done with this conversation."],
-    bad: ["Don't raise your voice at me!", "{ex} You want wahala? You'll get it!", "Try me! Try me!", "Who do you think you are?!"],
-  },
-  accuse: {
-    good: ["...How did you know?", "Keep your voice down!", "You don't know what you're talking about.", "Why are you looking at me like that?"],
-    meh: ["Me? A Saboteur? Please.", "You're wasting your time.", "Accuse somebody else.", "Everybody is a suspect to you."],
-    bad: ["How dare you?! I'm a housemate!", "{ex} You're the Saboteur, accusing others!", "I'll remember this at the Showdown.", "You just made an enemy."],
-  },
-  apologize: {
-    good: ["It's okay. Come here.", "Apology accepted, {pet}.", "Thank you. That took guts.", "We're good. For real."],
-    meh: ["Okay. I hear you.", "Hmm. Let's see.", "Words are easy.", "Fine."],
-    bad: ["Sorry for what? It's too late.", "Keep your sorry.", "No.", "Don't come near me."],
-  },
-  peace: {
-    good: ["Peace. Let's leave the past.", "Okay, truce. No more wahala.", "Life is too short. We're cool.", "Handshake. Clean slate."],
-    meh: ["Truce. For now.", "I'll think about it.", "Maybe.", "Let's see how it goes."],
-    bad: ["Peace? After what you did?", "Never.", "Not today, not tomorrow.", "No peace for you."],
-  },
-  refuse: {
-    asleep: ["Zzz... Leave me... sleeping..."],
-    tired: ["I'm too drained for this right now."],
-  },
-};
-
-/** Secrets unlocked with Deep Talk (kept vague so they work for anyone). */
-const SECRETS = {
-  tobi: "My club almost closed last year. I'm here for the money, not the clout.",
-  ada: "Half my skits are about people in this house. They don't know yet.",
-  musa: "I left someone special in Kaduna to come here. I think about her every day.",
-  ivie: "My fashion label is in debt. This prize would save it.",
-  kunle: "Before church, I was a DJ in Ibadan clubs. Nobody here knows.",
-  ebi: "My temper? I got it from my father. I'm trying to be better.",
-  nedu: "My startup failed twice. I'm reading everybody because I can't afford to lose again.",
-  nkoyo: "I cook for everybody because feeding people is the only way I know to be loved.",
-  zee: "I failed the bar exam once. My family doesn't know.",
-  mekus: "My shop in Onitsha burnt down last year. Everything I have is in this game.",
-};
-
-/** AI to AI scene scripts. Each is a list of [speaker, line] where A and B are the pair. */
-const SCENES = {
-  flirt: [
-    [["A", "You look really good today, you know that?"], ["B", "I know. But say it again."], ["A", "Fine. You look really, really good."], ["B", "Hmm. Keep talking."]],
-    [["A", "Why do I keep ending up next to you?"], ["B", "Maybe the universe is trying to tell you something."], ["A", "Or maybe you keep following me."], ["B", "Ehn? Please. You wish."]],
-    [["A", "If this house wasn't full of cameras..."], ["B", "What would you do?"], ["A", "Wouldn't you like to know."], ["B", "Omo. Behave!"]],
-  ],
-  kiss: [
-    [["A", "Come here."], ["B", "The cameras..."], ["A", "Let them watch."], ["*", "(They kiss. Somebody gasps across the room.)"]],
-    [["B", "Say it."], ["A", "I like you. Too much."], ["*", "(A slow kiss. The whole house will know by breakfast.)"]],
-  ],
-  argue: [
-    [["A", "Don't ever talk about me behind my back again!"], ["B", "Then stop doing things worth talking about!"], ["A", "{ex} You want wahala? You'll see wahala!"], ["B", "I'm not scared of you!"]],
-    [["A", "You ate my food! I labelled it!"], ["B", "It's a shared kitchen, abeg!"], ["A", "Shared? Shared ke?"], ["B", "Go and cry to Mama Eye!"]],
-    [["A", "I heard what you said in the garden."], ["B", "And? Everything I said is true!"], ["A", "You're fake! Everybody can see it!"], ["B", "Better fake than boring!"]],
-  ],
-  gossip: [
-    [["A", "Have you noticed {x}? Always whispering."], ["B", "Ehen! I thought I was the only one."], ["A", "Something is not adding up."], ["B", "Let's watch {x} closely this week."]],
-    [["A", "Between us... {x} is not who they pretend to be."], ["B", "Tell me everything. Now."], ["A", "Not here. Too many ears."], ["B", "Okay, tonight then."]],
-    [["A", "{x} was talking about you yesterday."], ["B", "Me? What did they say?"], ["A", "Nothing sweet, let me just say that."], ["B", "Okay. Okay. Noted."]],
-  ],
-  deal: [
-    [["A", "Wednesday is coming. You save me, I save you."], ["B", "Deal. But if you betray me..."], ["A", "I won't. Handshake?"], ["B", "Handshake."]],
-    [["A", "We need numbers. You, me, and one more."], ["B", "Who can we trust?"], ["A", "Nobody. That's why we need each other."], ["B", "Fine. We're a team now."]],
-  ],
-  bond: [
-    [["A", "You're the only sane person here, I swear."], ["B", "Hahaha! Birds of a feather."], ["A", "Whatever happens, we stay tight."], ["B", "Till the finale."]],
-    [["A", "I miss my mum's egusi soup."], ["B", "Don't start! I'll cry!"], ["A", "Hahaha! Okay, okay. We'll survive."], ["B", "Together."]],
-  ],
-  scheme: [
-    [["A", "The Whisper wants a name."], ["B", "Then we give them one. {x}."], ["A", "{x} has been asking too many questions."], ["B", "Exactly. Let's plant something."]],
-    [["A", "Keep your face normal. They're watching."], ["B", "I know. Tomorrow we move."], ["A", "Skim small, not big. Nobody will notice."], ["B", "Trust me."]],
-  ],
-  cry: [
-    [["A", "I can't do this. Everybody hates me."], ["B", "Hey, hey. Breathe. Nobody hates you."], ["A", "Then why do I feel alone?"], ["B", "Come. Let's sit down."]],
-  ],
-};
-
-/** Reason lines AI use when they explain a vote or save. */
-const MOTIVE = {
-  save: ["Loyalty. Simple.", "They've been real with me.", "My heart chose.", "Strategy. That's all I'll say.", "They fed me when I was hungry."],
-  evict: ["They're playing a game, not living.", "I don't trust them.", "Something about them is fake.", "The house is calmer without them.", "It's strategy. Nothing personal."],
-};
-
-/** Viewer feed templates. */
-const TWEET = {
-  ship: ["{a} and {b}?? #{s} is REAL", "The way {a} looks at {b}... #{s} forever", "Not me shipping {a} and {b} at 2am #{s}"],
-  fight: ["{a} vs {b} is the content I pay data for", "{a} about to catch a strike, I can feel it", "{b} did NOT deserve that from {a}", "Somebody hold {a} back biko"],
-  kiss: ["THEY KISSED. {a} and {b}. I'm screaming #{s}", "{a} and {b} kissing in the garden, the producers are eating good"],
-  sus: ["Who else thinks {a} is a Saboteur?", "{a} is too quiet. That's a Saboteur move.", "Watch {a}. Just watch."],
-  you: ["{a} is the main character this season", "{a} came to PLAY", "Not {a} running the whole house", "{a} is giving mastermind"],
-  youbad: ["{a} is so fake it hurts", "{a} lying on camera like we can't see", "{a} needs to go on Sunday"],
-  funny: ["{a} is the funniest person in that house", "{a} has me crying laughing every episode"],
-  hoh: ["{a} as Head of House? The house is shaking", "{a} won HoH and chose violence"],
-  noms: ["{a} on the nomination list?! I'm voting", "Save {a}! Vote vote vote!"],
-  strike: ["{a} STRUCK?! The Saboteurs are not playing", "RIP {a}. The Saboteurs chose violence"],
-  boring: ["Is {a} even in the house?", "{a} is wallpaper at this point"],
-};
-// ---------------------------------------------------------------------------
-// Character voice. Each housemate answers in their own way; the shared REPLY
-// bank fills any gap. `open` lines start AI to AI scenes. Placeholders as in
-// REPLY, plus {x} for the person a scene is about.
-// ---------------------------------------------------------------------------
-
-const VOICE = {
-  tobi: {
-    chat: {
-      good: ["{ex} {you}! You get correct vibe. If this was my club, you'd be in VIP.", "This is the energy I like. No dull moment. Talk to me!"],
-      meh: ["Yeah, yeah. Cool. Have you seen my chain today though?", "We dey. Just saving energy for the party."],
-      bad: ["Abeg, I'm not in VIP mood right now.", "You're blocking my light, {pet}. Small small."],
-    },
-    joke: { good: ["Odogwu is CRYING! Hahaha! You're booked for my next show!", "Chai! Say it again so the cameras catch it!"], bad: ["Even my DJ tells better jokes. And he doesn't talk.", "That one no reach. Next!"] },
-    compliment: { good: ["Finally, somebody said it! Odogwu is the moment.", "You see the drip? You see it! Thank you, {pet}."], bad: ["I know I'm fine. What else do you want?", "Compliment don land, but I still don't trust you."] },
-    flirt: {
-      good: ["Omo, you're bold! I like that. Come and sit closer.", "Is this how you want to play? Odogwu is ready."],
-      meh: ["Haha, cute. Line up behind the others, {pet}.", "You're on the guest list. Not VIP yet."],
-      bad: ["I'm flattered, but no. Odogwu has standards.", "Easy! Not everybody can handle this."],
-    },
-    deep: { good: ["No cameras? Okay. Real talk. {secret}", "Odogwu is not always loud, you know. {secret}"], bad: ["Deep talk ke? I'm here to shine, not to cry.", "Abeg, keep it light. My face is for the cameras."] },
-    hug: { good: ["Come here! Odogwu hug, maximum strength!", "Group hug! Oh, it's just us. Still counts!"], bad: ["Mind the chain, mind the chain!", "Small space, {pet}. I just fixed my shirt."] },
-    gift: { good: ["For me? Omo! You know how to treat a superstar!", "This is a VIP gift. I'm posting it the day I leave."] },
-    shade: { good: ["Hahaha! You're wicked! Somebody bring ice!", "Chai! That one landed! The whole lounge felt it!"], bad: ["You want to shade Odogwu? On my own show?", "Say it louder, let the fans hear you fall."] },
-    argue: { good: ["Okay, okay! Odogwu hears you. Calm down.", "Fine! You win. But I'm still the loudest."], bad: ["You're shouting at me? Me? Odogwu?!", "Lower your voice! You don't know who you're talking to!"] },
-    apologize: { good: ["It's fine. Odogwu doesn't carry grudges. Too heavy.", "Accepted. Buy me a drink at the party and we're square."], bad: ["Sorry is not enough. You embarrassed me on camera.", "Keep it. I'm still vexed."] },
-    open: {
-      argue: ["Who touched my chain? Who?!", "You think you can disrespect me in front of everybody?"],
-      flirt: ["You know you're the finest person in this house, abi?", "Tonight, you and me. The party. No excuses."],
-      bond: ["Odogwu and you, we're the real ones!", "When we leave, I'm taking you to my club. VIP."],
-      gossip: ["Have you seen {x}? Trying to steal my spotlight."],
-    },
-  },
-  ada: {
-    chat: {
-      good: ["Ehen! See, this gist is going in my skit. You're a natural!", "Nne, you're funny without even trying. I'm jealous."],
-      meh: ["Mm. I'm writing a skit in my head. Continue.", "Okay. Nice. Let me pretend I'm listening."],
-      bad: ["This conversation is a skit, and nobody is laughing.", "Chineke, you again? I'm on break."],
-    },
-    joke: { good: ["Hahahaha! Nne! I'm stealing that joke. You'll see it online!", "Ehen! Who wrote that? Give that writer a raise!"], bad: ["As a professional comedian, I'm offended.", "Even my mother's jokes land better. And she has none."] },
-    compliment: { good: ["Awww, nne! Say it into the camera so my fans hear.", "You noticed my edges? Somebody finally noticed!"], bad: ["Is this for a skit? Because it's not landing.", "Sweet mouth. I've written that character before."] },
-    flirt: {
-      good: ["Chineke! Is this a love skit? Because I'm playing along.", "Ehen, so you like me? Okay, I'll allow it."],
-      meh: ["Haha, cute. That line needs a second draft.", "I'll think about it. Between takes."],
-      bad: ["Cut! Cut! That scene is not working.", "Please, I came here for content, not this."],
-    },
-    deep: { good: ["Okay. No jokes. For once. {secret}", "Comedians cry too, you know. {secret}"], bad: ["If I talk deep, I'll start crying. Next topic.", "Nne, I only do deep talk on my own channel."] },
-    hug: { good: ["Group hug! Okay, it's two of us. Still a group!", "Ehen! I needed this. Squeeze!"], bad: ["Ah ah, wait first. Let me finish my bit.", "Not now, my makeup is fresh."] },
-    gift: { good: ["For me? Ehen! This is going in a thank-you skit!", "Chineke, you're too sweet. What do you want? I'm joking. Thank you!"] },
-    shade: { good: ["HAHAHA! Nne, the shade! I'm screaming!", "That's a whole skit! Let me write it down!"], bad: ["You're throwing shade at the queen of shade? Brave.", "Nne, I'll roast you so well, your village will hear."] },
-    argue: { good: ["Okay, fine! You win. I'll still put you in a skit.", "You're right. Don't let it go to your head."], bad: ["Chineke! You're shouting like a Nollywood villain!", "Ehen? You want to fight me? I'll write you out of my life!"] },
-    apologize: { good: ["Apology accepted. You're back in my good skits.", "Fine. We move. You owe me one joke."], bad: ["Sorry? Your sorry is giving rehearsal.", "Not yet. Let me be angry in peace."] },
-    open: {
-      argue: ["So you think I didn't hear what you said? I hear everything!", "You're the villain of my next skit. Congratulations!"],
-      flirt: ["If I put you in my skit, you'd be the love interest.", "Stop looking at me like that. I'll start blushing on camera."],
-      bond: ["You and me, we should start a channel when we leave.", "Nne, I'm so happy you're here. This house is mad."],
-      gossip: ["Nne, have you noticed how {x} talks? I'm writing a skit."],
-    },
-  },
-  musa: {
-    chat: {
-      good: ["Wallahi, this is the best conversation I've had all week.", "You are easy to be around. That is rare here."],
-      meh: ["Hmm. Yes. It is a fine day.", "I am listening. I just don't have much to say."],
-      bad: ["Not now, my friend. I am thinking.", "Some silence would be better, I think."],
-    },
-    joke: { good: ["Hahaha! Ah, you got me. That was clever.", "Wallahi, I don't laugh easily. You made me laugh."], bad: ["Hmm. I will think about that one later.", "I understood it. I just did not find it funny."] },
-    compliment: { good: ["Thank you. Kind words build strong foundations.", "You are generous. I will remember this."], bad: ["Hmm. Kind words come cheap in this house.", "Thank you. But what are you building with them?"] },
-    flirt: {
-      good: ["Ah. You make it hard to stay calm.", "Patience is my strength. You are testing it."],
-      meh: ["You are sweet. Let us take it slowly.", "Hmm. I am not a man who rushes."],
-      bad: ["I respect you, but no.", "My heart is not a game, my friend."],
-    },
-    deep: { good: ["I don't say this often. {secret}", "You have earned honesty. {secret}"], bad: ["Some doors stay closed. Forgive me.", "Not today. I am not ready."] },
-    hug: { good: ["Come. You are family now.", "Ah. A good hug fixes many things."], bad: ["Let us just shake hands.", "I prefer my space, my friend."] },
-    gift: { good: ["You did not have to. Thank you, truly.", "I will not forget this kindness."] },
-    shade: { good: ["Hah! Sharp tongue. Remind me not to cross you.", "Ah. Cold, but true."], bad: ["That was unnecessary.", "Hmm. Words like that are hard to take back."] },
-    argue: { good: ["Fine. You have a point. Let us stop here.", "I hear you. Let us both breathe."], bad: ["I am calm. Do not mistake that for weak.", "Wallahi, you will regret raising your voice at me."] },
-    apologize: { good: ["Already forgiven. Life is too short.", "Thank you for saying it. We are good."], bad: ["I forgive slowly. Give me time.", "Words are easy. Show me."] },
-    open: {
-      argue: ["You crossed a line. I want you to know that.", "I have been patient with you. No more."],
-      flirt: ["Walk with me in the garden tonight?", "You know I don't say things I don't mean."],
-      bond: ["Whatever happens on Sunday, you have a brother in me.", "When this is over, come to Kaduna. My mother will feed you."],
-      gossip: ["Have you watched {x} closely? Something does not fit."],
-    },
-  },
-  ivie: {
-    chat: {
-      good: ["Darling, you have taste. I can tell from the way you talk.", "Oya, sit. You're the only interesting person today."],
-      meh: ["Mm hm. Darling, have you seen my new braids?", "Cute talk. I'm busy being fabulous."],
-      bad: ["Darling, not now. I'm in my creative zone.", "Ehn ehn, you're blocking my mirror."],
-    },
-    joke: { good: ["Hahaha! Darling, stop! My lashes are falling off!", "Oya, you're funny. And funny is very attractive."], bad: ["Darling, that joke is not in season.", "Ehn ehn. Try again next collection."] },
-    compliment: { good: ["Darling! Finally somebody with an eye for design!", "You noticed the stitching? You're a keeper."], bad: ["I know I look good. What's the catch?", "Compliments are free. Votes are not, darling."] },
-    flirt: {
-      good: ["Oya, keep talking. I like where this is going.", "Darling, you're dangerous. I like dangerous."],
-      meh: ["Cute. You're on my mood board. Not the runway yet.", "Maybe, darling. Impress me more."],
-      bad: ["Darling, you're not my size.", "Ehn ehn. Wrong fabric, wrong fit."],
-    },
-    deep: { good: ["Darling, close the door. {secret}", "Behind all the fashion... {secret}"], bad: ["Deep talk wrinkles my face, darling. No.", "My secrets are couture. Not for everybody."] },
-    hug: { good: ["Oya, come! Careful with the outfit. Okay, squeeze!", "Darling! Hug accepted. You smell nice."], bad: ["Darling, the dress! Don't crush the dress!", "Air hug. That's my policy."] },
-    gift: { good: ["For me? Darling, you understand luxury!", "Oya, this is giving thoughtful. I love it."] },
-    shade: { good: ["Darling! That was couture shade!", "Ehn ehn! You're wicked and I'm obsessed!"], bad: ["Darling, your shade is from last season.", "You want to shade a designer? I'll tailor you a reply."] },
-    argue: { good: ["Fine, darling. You win this round.", "Oya, okay! Peace. My skin can't take stress."], bad: ["Darling, lower your voice. You're ruining my aura.", "Ehn ehn! Don't you dare come for me!"] },
-    apologize: { good: ["Apology accepted, darling. Don't wrinkle it again.", "Oya, we're fine. Hug me."], bad: ["Darling, that sorry doesn't match your outfit.", "Not today. Try tomorrow, in better shoes."] },
-    open: {
-      argue: ["Who wore my dress without asking? Who?!", "Darling, you've been talking about me. I know everything."],
-      flirt: ["Oya, tell me I look good. I know I do. Say it.", "Darling, you're staring. Should I charge for it?"],
-      bond: ["When we leave, I'm designing your whole wardrobe.", "Darling, you're the only one here with sense."],
-      gossip: ["Darling, have you seen what {x} has been wearing? And doing?"],
-    },
-  },
-  kunle: {
-    chat: {
-      good: ["God bless you, {you}. You have a good spirit.", "This is fellowship. I've missed it in this house."],
-      meh: ["Mm. Okay. God is in control.", "Fine, fine. I'm just here praying for strength."],
-      bad: ["Haba. I'm not in the mood for idle talk.", "Let me be. I'm meditating."],
-    },
-    joke: { good: ["Jesu! Hahaha! God forgive me, that was funny!", "Ah ah! Even the angels are laughing!"], bad: ["Haba. That joke needs deliverance.", "I will pray for that joke."] },
-    compliment: { good: ["Thank you. All glory to God.", "Ah ah, you'll make me proud. Pride is a sin. Say more."], bad: ["Flattery is a trap. Proverbs warned me.", "Hmm. The devil also says sweet things."] },
-    flirt: {
-      good: ["Ah ah! I'm blushing. God help me.", "Jesu! Okay. Okay. I'll allow it."],
-      meh: ["Let us take it slow. With prayer.", "I need to pray about this one."],
-      bad: ["Haba! Flee from temptation! Flee!", "No. My spirit is not agreeing."],
-    },
-    deep: { good: ["Okay. Confession time. {secret}", "God knows this, and now you. {secret}"], bad: ["Some things are between me and God.", "Not today. My heart is heavy."] },
-    hug: { good: ["Come, let me pray over you. And hug you.", "God bless this hug. Amen."], bad: ["A holy handshake will do.", "Haba, keep a distance. For holiness."] },
-    gift: { good: ["God will bless you! Thank you!", "Ah ah! This is a blessing!"] },
-    shade: { good: ["Jesu! That was savage. Forgive me, I laughed.", "Haba! You're wicked. Say it again."], bad: ["God is watching you. And so am I.", "Your mouth will put you in trouble."] },
-    argue: { good: ["Okay. Peace. Blessed are the peacemakers.", "Fine. Let it go. I'll pray for both of us."], bad: ["Haba! I rebuke that spirit! I rebuke it!", "You're shouting at a man of God? Ah!"] },
-    apologize: { good: ["I forgive you. As I am forgiven.", "Amen. We're good, {pet}."], bad: ["I forgive. But I don't forget.", "Pray about it first. Then come back."] },
-    open: {
-      argue: ["God is watching, and so am I. What you did was wrong.", "Haba! You can't keep doing this to people!"],
-      flirt: ["You know, I've been praying for someone like you.", "Sing with me tonight? Just us?"],
-      bond: ["Let's pray together before Sunday.", "You're a blessing to this house, truly."],
-      gossip: ["I don't like to judge, but {x}... God knows."],
-    },
-  },
-  ebi: {
-    chat: {
-      good: ["You're real. I like real people. Sit down.", "Abeg, stay. You're the only one not getting on my nerves."],
-      meh: ["Yeah. Fine. What else?", "I'm listening. Barely."],
-      bad: ["Abeg, I'm not in the mood. Move.", "See me see trouble! You again?"],
-    },
-    joke: { good: ["Hahaha! Okay, that was funny. I'm not angry today.", "Abeg stop! I'm laughing, I'm laughing!"], bad: ["Is that a joke? Because I'm not laughing.", "Tufiakwa! Don't ever tell that joke again."] },
-    compliment: { good: ["Thank you. You're not too bad yourself.", "Abeg, stop, before I start smiling."], bad: ["What do you want? Say it straight.", "I don't do sweet mouth. Say what you came for."] },
-    flirt: {
-      good: ["Hmm. You're brave. I like brave.", "Okay. You have my attention. Don't waste it."],
-      meh: ["Slow down. I bite.", "Maybe. If you survive my temper."],
-      bad: ["Tufiakwa! Not today, not ever.", "Abeg, redirect that energy before I redirect you."],
-    },
-    deep: { good: ["I don't open up. But fine. {secret}", "You've earned it. {secret}"], bad: ["My business is my business. Move.", "I don't do tears on camera."] },
-    hug: { good: ["Come here. Quick one. Don't tell anybody.", "Fine. Hug. I needed it, okay?"], bad: ["Don't touch me. I'm warning you.", "Abeg, personal space. Pressure is building."] },
-    gift: { good: ["For me? Okay. Thank you. Don't make it weird.", "Abeg, this is nice. I'm keeping it."] },
-    shade: { good: ["Hahaha! Savage! That's how to talk!", "Correct! Somebody had to say it!"], bad: ["Say it to my face! Go on! Say it!", "See me see trouble! You want wahala?"] },
-    argue: { good: ["Fine! Fine! You're right. I'm going to the gym.", "Okay! I hear you. Don't push it."], bad: ["You want to try me? Try me! I dare you!", "Tufiakwa! I will scatter this whole house!"] },
-    apologize: { good: ["Okay. I accept. Don't do it again.", "We're good. My temper is down."], bad: ["Sorry? After everything? Abeg, comot.", "Not now. I'm still boiling."] },
-    open: {
-      argue: ["Try me. I dare you. Try me!", "You think I didn't see what you did? I saw everything!"],
-      flirt: ["You. Me. Gym. Tomorrow morning. Don't be late.", "I don't do soft. But for you, maybe."],
-      bond: ["Anybody touches you, they deal with me.", "You're my person in this house. Remember that."],
-      gossip: ["{x} is getting on my last nerve. I'm not even joking."],
-    },
-  },
-  nedu: {
-    chat: {
-      good: ["Interesting. You think before you talk. That's rare.", "I like this. Let's talk more often. Strategically."],
-      meh: ["Okay. Noted.", "Mm. I'm running numbers in my head. Continue."],
-      bad: ["I don't have bandwidth for this right now.", "This conversation has no return on investment."],
-    },
-    joke: { good: ["Hah! Okay, that was a good one. I'll allow it.", "Omo! You surprised me. I don't like surprises, but I liked that."], bad: ["I see the setup. I don't see the punchline.", "Interesting attempt. Low yield."] },
-    compliment: { good: ["Thank you. I'll put that in my pitch deck.", "Appreciated. You read people well."], bad: ["Everybody has a price. What's yours?", "Flattery is a strategy. I know it well."] },
-    flirt: {
-      good: ["Interesting. You're a risk I might take.", "See ehn, I don't mix business and pleasure. Usually."],
-      meh: ["Let me do my due diligence first.", "Maybe. Send me a proposal."],
-      bad: ["That's not a deal I'm interested in.", "Hard pass. Nothing personal. Just numbers."],
-    },
-    deep: { good: ["Off the record? {secret}", "I've never told anyone here. {secret}"], bad: ["Information is currency. I don't give it out for free.", "No. Not yet."] },
-    hug: { good: ["Okay. Quick hug. Strategic alliance confirmed.", "Fine. I'm not a hugger, but fine."], bad: ["Let's keep this professional.", "A handshake is more my style."] },
-    gift: { good: ["Interesting. An investment in me? Smart.", "Thank you. I'll remember this when it counts."] },
-    shade: { good: ["Omo. That was precise. Surgical.", "Interesting. I didn't know you had that in you."], bad: ["Cute. I'll remember that on Wednesday.", "Careful. I keep records."] },
-    argue: { good: ["Fine. Your argument holds. For now.", "Okay. Let's not waste energy."], bad: ["You're emotional. I'm not. That's why I'll win.", "Raise your voice all you want. Numbers don't lie."] },
-    apologize: { good: ["Accepted. Let's move forward.", "Noted. Account settled."], bad: ["I don't do refunds on trust.", "Too late. The market has moved."] },
-    open: {
-      argue: ["I know what you did. I have receipts. Literally.", "You thought I wouldn't notice? I notice everything."],
-      flirt: ["You're the only person here I can't predict. I like that.", "Let's go somewhere quiet. I want to understand you."],
-      bond: ["We should form a long-term partnership. In here and outside.", "You think clearly. We'll go far."],
-      gossip: ["Look at {x}. Every move is calculated. Too calculated."],
-    },
-  },
-  nkoyo: {
-    chat: {
-      good: ["Eh heh! My pikin, come and sit. Have you eaten?", "You have a good spirit. Come, let me dish you food."],
-      meh: ["Mm. Okay, my dear. Go and rest.", "I'm cooking. Talk to me while I stir."],
-      bad: ["Not now, my dear. The soup will burn.", "Nawa o. Let me face my pot."],
-    },
-    joke: { good: ["Eh heh! Hahaha! You'll kill me with laughter!", "My God! Say it again, let me laugh well!"], bad: ["Hmm. That joke needs more salt.", "Nawa o. Even the pepper is sweeter."] },
-    compliment: { good: ["Thank you, my dear. It's the edikang ikong.", "Ahn, you're sweet. Come, I'll give you extra meat."], bad: ["Sweet mouth won't get you a second plate.", "Hmm. Who sent you?"] },
-    flirt: {
-      good: ["My God! You want to make me blush?", "Eh heh! Okay o. I'm listening."],
-      meh: ["My dear, I'm too busy cooking for love.", "Hmm. Let me finish this pot first."],
-      bad: ["Behave yourself, my pikin.", "Nawa o! Go and sit down."],
-    },
-    deep: { good: ["Come, sit. Let me tell you something. {secret}", "My dear... {secret}"], bad: ["Some stories need food first. Not today.", "My heart is not for sharing today."] },
-    hug: { good: ["Come here, my pikin! Mama's hug!", "Eh heh! You needed this. I can tell."], bad: ["My hands are full of pepper, my dear!", "Not now, I'm cooking."] },
-    gift: { good: ["Eh heh! For me? God will bless you!", "My dear, you shouldn't have. Thank you."] },
-    shade: { good: ["Nawa o! Hahaha! You're wicked!", "My God! That shade is hotter than my pepper soup!"], bad: ["You're throwing shade in my kitchen? Get out!", "Nawa o. That mouth will get you evicted."] },
-    argue: { good: ["Okay, okay. Eat something and calm down.", "Fine, my dear. I hear you."], bad: ["Don't raise your voice in my kitchen!", "My God! Is this how your mother raised you?"] },
-    apologize: { good: ["It's okay, my pikin. Come and eat.", "All forgiven. Food heals everything."], bad: ["Hmm. You hurt me. Give me time.", "Not yet. The pot is still hot."] },
-    open: {
-      argue: ["Who ate the food I kept? Who?!", "In my kitchen? You'll disrespect me in my kitchen?"],
-      flirt: ["You always come to the kitchen when I'm cooking. Is it the food, or me?", "Eh heh! Taste this. Then tell me I'm not your favourite."],
-      bond: ["Come and eat. You're too thin. Everybody here is too thin.", "When this is over, come to Calabar. I'll feed you for a week."],
-      gossip: ["My dear, I've been watching {x}. Something is not right."],
-    },
-  },
-  zee: {
-    chat: {
-      good: ["For the record, you're one of the smart ones.", "I like you. That's rare. Don't make me regret it."],
-      meh: ["Okay. Noted for the record.", "Mm. Fascinating. Truly."],
-      bad: ["Objection. This conversation is irrelevant.", "Excuse me? Did I invite you to sit?"],
-    },
-    joke: { good: ["Kai! Okay, that was actually funny. Sustained.", "Hahaha! I object to how funny that was."], bad: ["Objection. That joke lacks evidence of humour.", "Wow. No."] },
-    compliment: { good: ["Correct. And thank you for noticing.", "Finally, an accurate statement."], bad: ["Flattery is inadmissible.", "I'm not rude, I'm just correct. And you're suspicious."] },
-    flirt: {
-      good: ["Kai! Okay, I'll consider your application.", "Interesting argument. Continue."],
-      meh: ["Motion to delay. I'll think about it.", "Maybe. Present more evidence."],
-      bad: ["Case dismissed.", "Excuse me? No. Absolutely not."],
-    },
-    deep: { good: ["This stays privileged. {secret}", "Off the record. {secret}"], bad: ["I'm not answering that.", "That's confidential."] },
-    hug: { good: ["Fine. One hug. Don't tell anybody.", "Kai! Okay, I needed that."], bad: ["Excuse me? Personal space is a right.", "Let's not."] },
-    gift: { good: ["Wow. For me? Okay, you're winning.", "Thank you. Exhibit A of good taste."] },
-    shade: { good: ["Kai! That was a closing argument!", "Wow. Savage. I respect it."], bad: ["Excuse me? I will cross-examine you.", "Careful. I argue for a living."] },
-    argue: { good: ["Fine. Your point stands. Barely.", "Okay. I concede this one. Only this one."], bad: ["Objection! You're out of order!", "Excuse me?! I will destroy you with facts!"] },
-    apologize: { good: ["Apology entered into the record. Accepted.", "Fine. We're good."], bad: ["Rejected. Insufficient remorse.", "I don't accept apologies without evidence."] },
-    open: {
-      argue: ["For the record, I heard everything you said about me.", "You want to argue with a lawyer? Interesting choice."],
-      flirt: ["I've been building a case for why you should like me.", "Admit it. You've been looking at me all day."],
-      bond: ["You're the only person I'd want as co-counsel.", "Stick with me. I always win."],
-      gossip: ["I've been building a case against {x}. Want to see the evidence?"],
-    },
-  },
-  mekus: {
-    chat: {
-      good: ["Nwanne! You talk like money. I like it!", "Hear me! The way you talk, you'll do well in Onitsha market."],
-      meh: ["Okay o. Market is slow today.", "Mm. When money speaks, I listen. You're not money."],
-      bad: ["Ahn ahn, not now. I'm calculating.", "Nwanne, go and come back. The shop is closed."],
-    },
-    joke: { good: ["Hahaha! Nwanne! You're my competition now!", "Ahn ahn! That one is for sale! I'm buying it!"], bad: ["That joke is cheap. Even I can't sell it.", "Hear me, leave comedy for me."] },
-    compliment: { good: ["Thank you! You know quality when you see it!", "Nwanne! You have eyes. Very good eyes."], bad: ["A sweet tongue sells bad goods. What are you selling?", "Hmm. Even the trader smiles before he cheats."] },
-    flirt: {
-      good: ["Ahn ahn! You want to buy my heart? It's not cheap o!", "Hear me! I'm interested. Let's negotiate."],
-      meh: ["Let me check my stock first.", "Maybe. Come back after market day."],
-      bad: ["Nwanne, this market is closed.", "No discount for you. Sorry."],
-    },
-    deep: { good: ["When a man tells you his story, he's giving you his wealth. {secret}", "Hear me well. {secret}"], bad: ["A wise trader doesn't show his stock to everybody.", "Not today, nwanne. The shop is closed."] },
-    hug: { good: ["Nwanne! Come here! Big hug!", "Ahn ahn! This is a fat hug. Thank you!"], bad: ["Ahn ahn, hold on. Mind my pockets.", "Small small, nwanne."] },
-    gift: { good: ["Hear me! You understand business! Thank you!", "Nwanne! A gift? I'll pay you back with interest."] },
-    shade: { good: ["Hahaha! The shade! Even my customers can't talk like that!", "Ahn ahn! You're wicked! I'm learning!"], bad: ["When a fool throws shade, the wise man smiles. I'm smiling.", "Hear me, don't start what you can't finish."] },
-    argue: { good: ["Okay! Okay! When two elephants fight, the grass suffers. Let's stop.", "Fine, nwanne. You win this market day."], bad: ["Ahn ahn! You're shouting at me like I owe you!", "Hear me! The fly that has nobody to advise it follows the corpse into the grave!"] },
-    apologize: { good: ["It's okay, nwanne. Business continues.", "Accepted. We move. Profit over pride."], bad: ["Sorry doesn't pay debts.", "Ahn ahn. Not yet. The wound is fresh."] },
-    open: {
-      argue: ["You owe me! Don't play with my money!", "Hear me! You can't cheat a trader!"],
-      flirt: ["If you were goods, I wouldn't even negotiate. Full price.", "Nwanne, come and help me count money. I'll give you commission."],
-      bond: ["After this house, come to Onitsha. We'll do business together.", "You're family now. My shop is your shop."],
-      gossip: ["Hear me, {x} is pricing everybody like goods in the market."],
-    },
-  },
-};
-
-/** The reply bank for a housemate: their own voice most of the time, the shared bank otherwise. */
-function replyBank(r, id, act, out) {
-  const v = VOICE[id] && VOICE[id][act] && VOICE[id][act][out];
-  return v && r.chance(0.75) ? v : REPLY[act][out];
+function hash(str) {
+  let h = 2166136261 >>> 0;
+  for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; }
+  return h >>> 0;
 }
 
-/**
- * Things housemates bring up from memory before they answer you. tone: -1
- * sours the talk, +1 warms it, 0 is just colour.
- */
-const CALLBACK = {
-  kiss_jealous: { tone: -1, t: ["I saw you and {y} in the {room}. Don't come here with sweet talk.", "{ex} You and {y}? In the {room}? And now you're talking to me?"] },
-  kiss_tease: { tone: 0, t: ["{ex} I saw you and {y} in the {room}. The cameras are eating good.", "So you and {y}, abi? The whole house saw it."] },
-  fight_mine: { tone: -1, t: ["After how you shouted at me {when}? You get mind.", "You still owe me an apology for {when}."] },
-  fight_saw: { tone: 0, t: ["That wahala with {y} {when}? Abeg, calm down small.", "I saw you and {y} going at it {when}. Who started it?"] },
-  told: { tone: 1, t: ["I've been watching {x} since you told me. You might be right.", "About what you said about {x}... I'm keeping my eyes open."] },
-  grudge: { tone: 1, t: ["I haven't settled that matter with {x} yet. Thank you for telling me.", "{x} and I will talk. Thanks to you."] },
-  broke: { tone: -1, t: ["You promised to save me. Then you didn't. I remember.", "Wednesday, you said you had my back. Where were you?"] },
-  saw_skim: { tone: -1, t: ["I saw what you did with the hustle money. I haven't told anybody. Yet.", "Money went missing on that task, and I know where some of it went."] },
-  snoop: { tone: -1, t: ["I saw you going through {y}'s things {when}. What were you looking for?", "Next time you snoop, check who is watching."] },
-  empty_bed: { tone: -1, t: ["Your bed was empty at night. Where did you go?", "Night walks, abi? Your bed was empty."] },
-  planted: { tone: -1, t: ["Somebody told me to watch you. So I'm watching.", "I got a note about you. Strange, no?"] },
-  crushtalk: { tone: 0, t: ["Have you said anything to {x}? About what I told you?", "Shh. Does {x} know yet? Don't tell me you told them!"] },
-  laughed: { tone: 1, t: ["My comedian! I'm still laughing from {when}.", "Ahn ahn, say something funny again. Like {when}."] },
-  gift: { tone: 1, t: ["I still remember the gift. You're thoughtful.", "You looked out for me {when}. I don't forget kindness."] },
-  deep: { tone: 1, t: ["Thank you for listening {when}. It helped.", "I feel lighter since our talk."] },
-  shaded: { tone: -1, t: ["So you're the one throwing shade {when}. Say it again.", "After that shade {when}? You want to talk now?"] },
-  curved: { tone: 0, t: ["About {when}... no hard feelings, okay?", "Things were awkward {when}. Let's reset."] },
-  liar: { tone: -1, t: ["You lied to me about {x}. I haven't forgotten.", "Before you talk, remember the lie about {x}."] },
-  ship: { tone: 1, t: ["There you are! I was looking for you.", "My person! Where have you been?"] },
-};
-/** Moves where a memory can colour the reply. */
-const CB_ACTS = new Set(["chat", "joke", "compliment", "deep", "hug", "gift", "flirt", "askout", "kiss", "asksave", "squad", "swear", "apologize", "peace"]);
-
-function whenOf(s, m) { return m.d === s.day ? "earlier" : m.d === s.day - 1 ? "yesterday" : "the other day"; }
-
-/** The freshest thing housemate t remembers about you that they haven't raised yet. */
-function callbackFor(s, r, t, act) {
-  if (!CB_ACTS.has(act)) return null;
-  const h = hmOf(s, t), now = s.day * 1440 + s.min;
-  if (h.cbAt !== undefined && now - h.cbAt < 180) return null;
-  const mem = s.mem[t] || [];
-  const v = rel(s, t, ME);
-  let pick = null;
-  const lie = s.lies.find((l) => l.to === t && l.exposed && !l.cb);
-  if (lie) pick = { key: "liar", x: lie.about, ref: lie, d: lie.d };
-  for (let i = mem.length - 1; i >= 0 && !pick; i--) {
-    const m = mem[i];
-    if (m.cb || m.d < s.day - 2) continue;
-    const mine = m.x === ME || m.y === ME || m.src === ME;
-    const other = m.x === ME ? m.y : m.x;
-    let key = null;
-    switch (m.k) {
-      case "kiss": if (mine && other !== t) key = v[RO] >= 30 ? "kiss_jealous" : "kiss_tease"; break;
-      case "fight": if (mine) key = other === t ? "fight_mine" : "fight_saw"; break;
-      case "told": case "grudge": if (m.src === ME && hmOf(s, m.x) && !hmOf(s, m.x).out) key = m.k; break;
-      case "crushtalk": if (hmOf(s, m.x) && !hmOf(s, m.x).out) key = m.k; break;
-      case "broke": case "saw_skim": case "empty_bed": case "planted": case "laughed": case "gift": case "deep": case "shaded": case "curved": case "snoop":
-        if (m.x === ME) key = m.k; break;
-    }
-    if (key) pick = { key, x: m.x, y: m.k === "snoop" ? m.y : other, room: m.room, ref: m, d: m.d };
-  }
-  if (!pick) { const sh = findShip(s, t, ME); if (sh && sh.official && r.chance(0.3)) pick = { key: "ship", d: s.day }; }
-  if (!pick || !r.chance(pick.key === "liar" ? 0.7 : 0.5)) return null;
-  if (pick.ref) pick.ref.cb = true;
-  h.cbAt = now;
-  const cb = CALLBACK[pick.key];
-  const text = fill(s, r, r.pick(cb.t), t, { x: pick.x })
-    .replace(/\{y\}/g, pick.y ? nameOf(s, pick.y) : "them")
-    .replace(/\{room\}/g, pick.room || "house")
-    .replace(/\{when\}/g, whenOf(s, pick));
-  return { t: text, tone: cb.tone, key: pick.key, ref: pick.ref };
-}
-
-/** First line of an AI to AI scene in the speaker's own voice, or null. */
-function sceneOpener(r, id, kind) {
-  const o = VOICE[id] && VOICE[id].open && VOICE[id].open[kind];
-  return o && r.chance(0.55) ? r.pick(o) : null;
-}
-
-// More scene scripts, merged into SCENES so every kind has more variety.
-const SCENES_MORE = {
-  argue: [
-    [["A", "Why is my cream finishing so fast? Somebody is using it!"], ["B", "Is your name written on it?"], ["A", "It's MY cream! In MY bag!"], ["B", "Then lock your bag, abeg!"]],
-    [["A", "You nominated me. Don't lie, I know you did."], ["B", "Prove it."], ["A", "{ex} I don't need proof, I have eyes!"], ["B", "Then use them to find the door."]],
-    [["A", "Every time I talk, you roll your eyes."], ["B", "Because every time you talk, it's nonsense."], ["A", "Say that again!"], ["B", "Nonsense! There, I said it!"]],
-    [["A", "You've been smiling in my face and stabbing my back."], ["B", "Who told you that? Point the person out."], ["A", "Everybody knows!"], ["B", "Then everybody is lying!"]],
-  ],
-  flirt: [
-    [["A", "Dance with me at the party?"], ["B", "Only if you don't step on my feet."], ["A", "I'll step on your heart instead."], ["B", "Omo. That was smooth. Too smooth."]],
-    [["A", "Why are you blushing?"], ["B", "I'm not blushing. It's hot."], ["A", "The AC is on full."], ["B", "...Leave me alone!"]],
-    [["A", "If we both make the finale, dinner is on me."], ["B", "And if only one of us makes it?"], ["A", "Then you'll come and find me."], ["B", "Hmm. Deal."]],
-  ],
-  kiss: [
-    [["A", "We shouldn't."], ["B", "But we want to."], ["*", "(They lean in. Somewhere, a housemate drops a spoon.)"]],
-  ],
-  gossip: [
-    [["A", "Did you see {x} at the Jollof Clash? Pure drama."], ["B", "They wanted to win too badly."], ["A", "Desperate people do desperate things."], ["B", "Exactly. Let's watch them."]],
-    [["A", "{x} said they're here for love."], ["B", "Love? In this house? Please."], ["A", "They're here for the money like everybody."], ["B", "At least we're honest about it."]],
-  ],
-  deal: [
-    [["A", "If I win Head of House, you're my tenant."], ["B", "And what do I give you?"], ["A", "Your save. Every Wednesday."], ["B", "Fine. But I keep receipts."]],
-  ],
-  bond: [
-    [["A", "Do you remember your first day in this house?"], ["B", "I was so scared! I almost went back!"], ["A", "And now look at you, running things."], ["B", "Hahaha! We run things!"]],
-    [["A", "When this is over, we're still friends. Promise?"], ["B", "Promise. Even if you win and forget me."], ["A", "Never! I'll share the money... small."], ["B", "Hahaha! Small ke?"]],
-    [["A", "Teach me your dance. The one from the party."], ["B", "You're not ready."], ["A", "Try me."], ["B", "Okay. Left foot first. No! Your other left!"]],
-  ],
-  scheme: [
-    [["A", "They're starting to suspect. We need a distraction."], ["B", "Then let's start a fight. {x} and somebody loud."], ["A", "Perfect. Nobody looks for a Saboteur in the middle of wahala."], ["B", "Say less."]],
-  ],
-  cry: [
-    [["A", "I miss my family. Everything is too loud here."], ["B", "Hey. Look at me. You're stronger than this house."], ["A", "You think so?"], ["B", "I know so. Come, let's get some air."]],
-    [["A", "I think the fans hate me."], ["B", "The fans don't hate you. The fans love drama. That's all."], ["A", "Then why do I feel so small?"], ["B", "Because you're tired. Rest. Tomorrow is new."]],
-  ],
-};
-for (const k of Object.keys(SCENES_MORE)) SCENES[k] = SCENES[k].concat(SCENES_MORE[k]);
 // ---------------------------------------------------------------------------
-// Utilities
+// Small helpers
 // ---------------------------------------------------------------------------
 
-/** mulberry32. The state lives in s.seed so the whole season replays exactly. */
-function rngFrom(seed) {
-  let a = seed >>> 0;
-  const next = () => {
-    a = (a + 0x6d2b79f5) >>> 0;
-    let t = a;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-  return {
-    f: next,
-    int: (n) => Math.floor(next() * n),
-    pick: (arr) => arr[Math.floor(next() * arr.length)],
-    chance: (p) => next() < p,
-    range: (lo, hi) => lo + next() * (hi - lo),
-    shuffle: (arr) => { const o = arr.slice(); for (let i = o.length - 1; i > 0; i--) { const j = Math.floor(next() * (i + 1)); const t = o[i]; o[i] = o[j]; o[j] = t; } return o; },
-    get state() { return a; },
-  };
-}
-
-const clamp = (v, lo = 0, hi = 100) => (v < lo ? lo : v > hi ? hi : v);
 const clone = (o) => JSON.parse(JSON.stringify(o));
-const isInt = (v) => typeof v === "number" && Number.isInteger(v);
-const naira = (n) => "₦" + Math.round(n).toLocaleString("en-US");
-const hhmm = (min) => { const m = ((min % 1440) + 1440) % 1440; return String(Math.floor(m / 60)).padStart(2, "0") + ":" + String(m % 60).padStart(2, "0"); };
-
-function blockOf(min) {
-  if (min < 720) return 0; // morning
-  if (min < 1020) return 1; // afternoon
-  if (min < 1320) return 2; // evening
-  return 3; // night
-}
-const BLOCK_NAMES = ["MORNING", "AFTERNOON", "EVENING", "NIGHT"];
-
-function hmOf(s, id) { for (const h of s.hm) if (h.id === id) return h; return null; }
-function nameOf(s, id) { if (id === ME) return s.hm[0].name; const c = BY[id]; return c ? c.name : id; }
-function inHouse(s) { return s.hm.filter((h) => !h.out); }
-function inHouseIds(s) { return inHouse(s).map((h) => h.id); }
-function aiIn(s) { return s.hm.filter((h) => !h.out && !h.human); }
-function isSab(s, id) { const h = hmOf(s, id); return !!h && h.role === "S"; }
-
+const dist = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
+const pOf = (s, id) => s.ps.find((p) => p.id === id) || null;
+const playing = (s) => s.ps.filter((p) => !p.spec);
+const living = (s) => s.ps.filter((p) => !p.spec && p.alive);
+const humans = (s) => s.ps.filter((p) => !p.bot);
+const isSab = (p) => p && p.role === "S";
+function bump(s) { s.ver = (s.ver || 0) + 1; }
+function feed(s, text, k) { s.dirty = true; s.fid = (s.fid || 0) + 1; s.feed.push({ i: s.fid, t: text, k: k || "", at: s.now }); if (s.feed.length > 8) s.feed.splice(0, s.feed.length - 8); }
+function exOf(p, s) { const c = CAST[p.look] || CAST.pf; return R.pick(s, c.ex); }
 // ---------------------------------------------------------------------------
-// Relationships: rel["a>b"] = [friendship, romance, trust, beef, attraction, suspicion]
-// How a feels about b. Values 0-100.
+// The walk grid: 72 x 52 cells of 0.5 m, "#" blocked. Generated by
+// tools/make_grid.mjs from the client's floor plan; do not edit by hand.
 // ---------------------------------------------------------------------------
 
-const F = 0, RO = 1, TR = 2, BF = 3, AT = 4, SU = 5;
-
-function rel(s, a, b) { return s.rel[a + ">" + b]; }
-function bump(s, a, b, idx, d) { const v = rel(s, a, b); if (v) v[idx] = clamp(Math.round(v[idx] + d)); }
-function mutual(s, a, b, idx, d) { bump(s, a, b, idx, d); bump(s, b, a, idx, d); }
-
-/** Overall liking of a toward b, used for saves and votes. */
-function liking(s, a, b) {
-  const v = rel(s, a, b);
-  if (!v) return 0;
-  return v[F] + v[TR] * 0.6 + v[RO] * 0.8 - v[BF] * 0.9 - v[SU] * 0.5;
-}
-
-/** Fuzzy 0-4 level the player can see for how an AI feels about them. */
-function level(v) { return v >= 80 ? 4 : v >= 60 ? 3 : v >= 40 ? 2 : v >= 20 ? 1 : 0; }
-
+const CELL = 0.5, GW = 72, GD = 52;
+const GRID = [
+  "###################################################################.....",
+  "#######################..##############....####...######...########.....",
+  "#....................##..##############....####...######...########.....",
+  "#....................##..##############......##...######...########.....",
+  "#....................#####...................##...######...########.....",
+  "#....................#####...######......###.##...######...########.....",
+  "#....................#####...######......###.##............########.....",
+  "#......................###...######......###.##............########.....",
+  "#.....##########.......###...................#####.........########.....",
+  "#.....##########.......###...............###.#####.....############.....",
+  "#.....##########.......###..........##...###.#####.....############.....",
+  "#...................................##...###...###.....######...........",
+  "#..............................................###.....######...........",
+  "#....................##......................##........######...........",
+  "#....###########.....##......................##............##...........",
+  "#....###########.....##......................###########################",
+  "#....###########.....##......................###########################",
+  "#....................####.....................##.......................#",
+  "#....................####.....................##............####.......#",
+  "#########..####################......###########............####.......#",
+  "################################.....##########........................#",
+  "####....######....#####......###.......................................#",
+  "####..............#####.##.............................................#",
+  "####..............#####.##..........................................##.#",
+  "####..............#####.####........................................##.#",
+  "####..............#####.####........................................##.#",
+  "####..............#####................................................#",
+  "####..............#####................................................#",
+  "####..............#####................................................#",
+  "####..............#####..............................................###",
+  "####..............#####..............................................###",
+  "####..............#####................................................#",
+  "####..............#####.............................##.................#",
+  "####..............#####.......####################..##.................#",
+  "####..............#####.......####################..##.................#",
+  "####..............###.........####################..##.................#",
+  "####..............###.........####################..##.................#",
+  "####..............#####.......####################..##.................#",
+  "####..............#####.......####################..##.................#",
+  "####..............#####.......####################..##.................#",
+  "####..............#####.......####################..##.................#",
+  "####..............#####.......####################..##.................#",
+  "####..............#####.......####################..##.................#",
+  "#######################.......####################..##.................#",
+  "#######################.......####################..##.................#",
+  "....................................................##.................#",
+  "....................................................##.................#",
+  ".......................................................................#",
+  "..........................##............................######......####",
+  "..........................##............................######......####",
+  "..........................##........................................####",
+  "########################################################################",
+].join("");
 // ---------------------------------------------------------------------------
-// Logs, feed, notes, memories
+// The house: walking, rooms, chore stations, spawn marks and meeting seats.
 // ---------------------------------------------------------------------------
 
-function note(s, text, kind = "info") {
-  s.nid += 1;
-  s.notes.push({ id: s.nid, t: text, k: kind });
-  if (s.notes.length > 12) s.notes.splice(0, s.notes.length - 12);
-}
+const W_HOUSE = GW * CELL, D_HOUSE = GD * CELL;
 
-function logEv(s, text, kind) {
-  s.log.push({ d: s.day, m: s.min, t: text, k: kind });
-  if (s.log.length > 80) s.log.splice(0, s.log.length - 80);
-}
+function blockedCell(i, j) { return i < 0 || j < 0 || i >= GW || j >= GD || GRID.charCodeAt(j * GW + i) === 35; }
+function walkable(x, z) { return blockedCell(Math.floor(x / CELL), Math.floor(z / CELL)) === false; }
+function inBounds(x, z) { return x >= 0 && z >= 0 && x <= W_HOUSE && z <= D_HOUSE; }
 
-function tweet(s, r, key, a, b, shipName) {
-  const tpl = TWEET[key];
-  if (!tpl) return;
-  const t = r.pick(tpl).replace(/\{a\}/g, nameOf(s, a)).replace(/\{b\}/g, b ? nameOf(s, b) : "").replace(/\{s\}/g, shipName || "");
-  s.feed.push({ h: r.pick(FEED_HANDLES), t, n: s.nid + s.feed.length });
-  if (s.feed.length > 30) s.feed.splice(0, s.feed.length - 30);
-}
-
-function remember(s, who, item) {
-  if (!s.mem[who]) return;
-  s.mem[who].push(Object.assign({ d: s.day, m: s.min }, item));
-  if (s.mem[who].length > 24) s.mem[who].splice(0, s.mem[who].length - 24);
-}
-
-function addGist(s, kind, text, tag, about) {
-  s.gid += 1;
-  s.gb.unshift({ id: s.gid, d: s.day, m: s.min, k: kind, t: text, tag: tag || "", about: about || [] });
-  if (s.gb.length > 60) s.gb.length = 60;
-}
-function hasTag(s, prefix) { return s.gb.some((g) => g.k !== "gist" && g.tag && g.tag.split(" ").some((t) => t.indexOf(prefix) === 0)); }
-
-/** Fill a template with a speaker's voice. */
-function fill(s, r, tpl, speaker, extra) {
-  const c = BY[speaker];
-  const you = s.hm[0].name;
-  let pet = c ? r.pick(c.pet) : "my friend";
-  if (c && extra && extra.romantic) pet = r.pick(c.petR);
-  return tpl
-    .replace(/\{ex\}/g, c ? r.pick(c.ex) : "Omo!")
-    .replace(/\{pet\}/g, pet)
-    .replace(/\{you\}/g, you)
-    .replace(/\{me\}/g, c ? c.name : you)
-    .replace(/\{x\}/g, extra && extra.x ? nameOf(s, extra.x) : "them")
-    .replace(/\{secret\}/g, (c && SECRETS[speaker]) || "");
-}
-
-function shipName(a, b) {
-  const x = a.slice(0, Math.ceil(a.length / 2));
-  const y = b.slice(Math.floor(b.length / 2));
-  return (x + y).replace(/^./, (m) => m.toUpperCase());
-}
-
-function findShip(s, a, b) { return s.ships.find((sh) => (sh.a === a && sh.b === b) || (sh.a === b && sh.b === a)); }
-function makeShip(s, r, a, b, official) {
-  let sh = findShip(s, a, b);
-  if (!sh) {
-    sh = { a, b, name: shipName(nameOf(s, a), nameOf(s, b)), official: false, d: s.day };
-    s.ships.push(sh);
-    tweet(s, r, "ship", a, b, sh.name);
+function nearestFree(x, z) {
+  if (walkable(x, z)) return [x, z];
+  for (let r = 0.5; r < 4; r += 0.25) for (let a = 0; a < 16; a++) {
+    const px = x + Math.cos((a * Math.PI) / 8) * r, pz = z + Math.sin((a * Math.PI) / 8) * r;
+    if (walkable(px, pz)) return [px, pz];
   }
-  if (official && !sh.official) { sh.official = true; logEv(s, `${nameOf(s, a)} and ${nameOf(s, b)} are officially a couple. #${sh.name}`, "ship"); }
-  return sh;
-}
-function breakShip(s, a, b) { s.ships = s.ships.filter((sh) => !((sh.a === a && sh.b === b) || (sh.a === b && sh.b === a))); }
-
-function addBeef(s, a, b) {
-  if (!s.beefs.some((x) => (x[0] === a && x[1] === b) || (x[0] === b && x[1] === a))) s.beefs.push([a, b]);
+  return [x, z];
 }
 
-function strike(s, r, id, why) {
-  const h = hmOf(s, id);
-  if (!h || h.out) return;
-  h.strikes += 1;
-  const nm = nameOf(s, id);
-  logEv(s, `${nm} received a strike for ${why}.`, "strike");
-  note(s, `${EYE}: ${nm}, you have received a strike for ${why}. (${h.strikes}/3)`, "strike");
-  h.comp = clamp(h.comp - 12);
-  if (id !== ME) tweet(s, r, "fight", id, id);
-}
-// ---------------------------------------------------------------------------
-// Season setup
-// ---------------------------------------------------------------------------
-
-function initSeason(pid, a) {
-  const r = rngFrom((a.seed >>> 0) ^ 0x5bd1e995);
-  const s = {
-    v: 1, pid, phase: "EV", day: 0, min: 1080, seed: 0,
-    hm: [], rel: {}, mem: {}, prom: {}, squads: [], ships: [], beefs: [], lies: [],
-    gb: [], gid: 0, feed: [], log: [], notes: [], nid: 0, scenes: [], scid: 0, heard: [],
-    pot: 0, hoh: null, tenant: null, noms: [], saves: null, vetoed: null, teams: null,
-    wager: null, plan: { skim: 0, plant: null, rumor: null }, strikeTarget: null, struck: null,
-    diary: { fav: null, snake: null, mood: null, mission: null }, mission: null,
-    ev: null, last: null, done: {}, result: null, out: null, peeks: 0, eye: 0,
-  };
-  // Player first, always at index 0.
-  s.hm.push({
-    id: ME, human: true, name: a.name, look: a.look, g: a.look === "m" ? "m" : "f", role: "H",
-    out: null, room: "arena", spot: 11, act: "idle", with: null, sc: null,
-    comp: 70, fans: 50, strikes: 0, coins: 200, energy: 10, immune: false, acts: 0, sus: 0,
-  });
-  for (const c of CAST) {
-    s.hm.push({
-      id: c.id, human: false, name: c.name, look: c.id, g: c.g, role: "H",
-      out: null, room: "arena", spot: 0, act: "idle", with: null, sc: null,
-      comp: 62 + r.int(16), fans: c.fans, strikes: 0, coins: 200, energy: 0, immune: false, acts: 0,
-    });
-    s.mem[c.id] = [];
-  }
-  // Roles: two Saboteurs.
-  let sabs;
-  const others = r.shuffle(AI_IDS);
-  if (a.fate === "saboteur") sabs = [ME, others[0]];
-  else if (a.fate === "housemate") sabs = [others[0], others[1]];
-  else sabs = r.chance(2 / 11) ? [ME, others[0]] : [others[0], others[1]];
-  for (const id of sabs) hmOf(s, id).role = "S";
-  s.sabs = sabs;
-
-  // Relationships.
-  const ids = [ME].concat(AI_IDS);
-  for (const x of ids) for (const y of ids) {
-    if (x === y) continue;
-    const cx = BY[x];
-    let att = r.int(55);
-    if (cx && cx.fl >= 4) att += 15;
-    if (y !== ME && BY[y] && BY[y].fl >= 4) att += 10;
-    s.rel[x + ">" + y] = [22 + r.int(16), 0, 22 + r.int(14), 0, clamp(att), 8 + r.int(10)];
-  }
-  for (const [x, y, f, ro, t, b] of HISTORY) {
-    for (const [p, q] of [[x, y], [y, x]]) {
-      const v = s.rel[p + ">" + q];
-      v[F] = f; v[RO] = ro; v[TR] = t; v[BF] = b; if (ro) v[AT] = Math.max(v[AT], 60);
-    }
-  }
-  seedRivalries(s, r);
-  // Saboteurs quietly look after each other.
-  if (sabs[0] !== ME && sabs[1] !== ME) { mutual(s, sabs[0], sabs[1], TR, 25); mutual(s, sabs[0], sabs[1], F, 10); }
-
-  s.seed = r.state;
-  startEntry(s, r);
-  s.seed = r.state;
-  return s;
+function clearLine(a, b) {
+  const d = Math.hypot(b[0] - a[0], b[1] - a[1]);
+  const n = Math.ceil(d / (CELL * 0.5));
+  for (let i = 1; i < n; i++) { const t = i / n; if (!walkable(a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t)) return false; }
+  return true;
 }
 
-// ---------------------------------------------------------------------------
-// Where the housemates are
-// ---------------------------------------------------------------------------
-
-function freeSpot(s, r, room, exclude) {
-  const used = new Set(s.hm.filter((h) => !h.out && h.room === room && h.id !== exclude).map((h) => h.spot));
-  const n = ROOMS[room].spots;
-  const free = [];
-  for (let i = 0; i < n; i++) if (!used.has(i)) free.push(i);
-  return free.length ? r.pick(free) : r.int(n);
-}
-
-function activityFor(s, r, h, room) {
-  const b = blockOf(s.min);
-  if (room === "bedroom") return s.min >= 1440 ? "sleep" : r.pick(["rest", "rest", "phone"]);
-  if (room === "kitchen") return r.pick(["cook", "eat", "idle"]);
-  if (room === "gym") return "workout";
-  if (room === "garden") return b === 1 && r.chance(0.5) ? "sunbathe" : r.pick(["idle", "idle", "sit"]);
-  if (room === "lounge" || room === "hoh") return r.pick(["sit", "sit", "idle"]);
-  return "idle";
-}
-
-/** Re-plan where every idle AI goes. Runs on the hour. */
-function placeAI(s, r) {
-  const b = Math.min(2, blockOf(s.min));
-  const late = s.min >= 1440;
-  for (const h of aiIn(s)) {
-    if (h.sc) continue; // mid-scene
-    const c = BY[h.id];
-    let room;
-    if (late && r.chance(0.82)) room = "bedroom";
-    else {
-      const w = Object.assign({}, c.home[b]);
-      for (const k of ROAM_ROOMS) w[k] = (w[k] || 0.4);
-      w.hoh = s.hoh === h.id || s.tenant === h.id ? 3 : 0;
-      if (h.comp < 35) { w.bedroom += 3; if (h.id === "ebi") w.gym += 2; }
-      if (late) { w.garden += 1; w.bedroom += 2; }
-      if (b < 2 && !late) w.bedroom = Math.min(w.bedroom, 1);
-      // Drift toward the people they want, away from the people they can't stand.
-      for (const o of inHouse(s)) {
-        if (o.id === h.id || !ROAM_ROOMS.includes(o.room)) continue;
-        const v = rel(s, h.id, o.id);
-        if (v[RO] >= 45) w[o.room] += 2.5;
-        if (v[F] >= 65) w[o.room] += 1.5;
-        if (v[BF] >= 60) w[o.room] = Math.max(0.2, w[o.room] - 1.5);
+/** A* over the grid with string pulling. Returns [[x, z], ...] ending at `to`. */
+function findPath(from, to) {
+  const [fx, fz] = nearestFree(from[0], from[1]);
+  const [tx, tz] = nearestFree(to[0], to[1]);
+  const s0 = Math.floor(fz / CELL) * GW + Math.floor(fx / CELL), g = Math.floor(tz / CELL) * GW + Math.floor(tx / CELL);
+  if (s0 === g) return [[tx, tz]];
+  const gi = g % GW, gj = (g / GW) | 0;
+  const h = (k) => Math.hypot((k % GW) - gi, ((k / GW) | 0) - gj);
+  const open = [s0], came = {}, gs = { [s0]: 0 }, fs = { [s0]: h(s0) }, inOpen = { [s0]: 1 };
+  let guard = 0, found = false;
+  while (open.length && guard++ < 5000) {
+    let bi = 0;
+    for (let q = 1; q < open.length; q++) if (fs[open[q]] < fs[open[bi]]) bi = q;
+    const cur = open[bi]; open[bi] = open[open.length - 1]; open.pop(); delete inOpen[cur];
+    if (cur === g) { found = true; break; }
+    const ci = cur % GW, cj = (cur / GW) | 0;
+    for (let di = -1; di <= 1; di++) for (let dj = -1; dj <= 1; dj++) {
+      if (!di && !dj) continue;
+      const ni = ci + di, nj = cj + dj;
+      if (blockedCell(ni, nj)) continue;
+      if (di && dj && (blockedCell(ci + di, cj) || blockedCell(ci, cj + dj))) continue;
+      const nk = nj * GW + ni;
+      const t = gs[cur] + (di && dj ? 1.414 : 1);
+      if (gs[nk] === undefined || t < gs[nk]) {
+        came[nk] = cur; gs[nk] = t; fs[nk] = t + h(nk);
+        if (!inOpen[nk]) { open.push(nk); inOpen[nk] = 1; }
       }
-      if (w.hoh === 0) delete w.hoh;
-      let tot = 0;
-      for (const k in w) tot += w[k];
-      let x = r.f() * tot;
-      room = "lounge";
-      for (const k in w) { x -= w[k]; if (x <= 0) { room = k; break; } }
     }
-    if (room !== h.room) { h.room = room; h.spot = freeSpot(s, r, room, h.id); }
-    h.act = activityFor(s, r, h, room);
-    h.with = null;
-    h.watch = null;
   }
+  if (!found) return [[tx, tz]];
+  const cells = [];
+  for (let k = g; k !== s0; k = came[k]) cells.push(k);
+  cells.reverse();
+  const pts = cells.map((k) => [(k % GW) * CELL + CELL / 2, ((k / GW) | 0) * CELL + CELL / 2]);
+  pts[pts.length - 1] = [tx, tz];
+  const out = [];
+  let anchor = [fx, fz];
+  for (let i = 0; i < pts.length; i++) {
+    const next = pts[i + 1];
+    if (next && clearLine(anchor, next)) continue;
+    out.push([Math.round(pts[i][0] * 100) / 100, Math.round(pts[i][1] * 100) / 100]);
+    anchor = pts[i];
+  }
+  return out;
 }
 
-// ---------------------------------------------------------------------------
-// AI scenes: drama that happens whether or not the player is watching
-// ---------------------------------------------------------------------------
-
-const PRIVATE = { gossip: 1, deal: 1, scheme: 1 };
-
-function pickSceneKind(s, r, a, b, room, alone) {
-  const ab = rel(s, a, b), ba = rel(s, b, a);
-  const night = s.min >= 1260;
-  if (isSab(s, a) && isSab(s, b) && alone && r.chance(0.7)) return "scheme";
-  if (ab[RO] >= 68 && ba[RO] >= 58 && (night || room === "hoh" || room === "garden") && r.chance(0.6)) return "kiss";
-  // Real grudges boil over before anything else; hot heads boil over sooner.
-  const beef = Math.max(ab[BF], ba[BF]), temper = Math.max(BY[a].tp, BY[b].tp);
-  if (beef >= 55 && r.chance(0.8)) return "argue";
-  if ((ab[RO] >= 35 || ba[RO] >= 35) && Math.max(ab[AT], ba[AT]) >= 45 && r.chance(0.7)) return "flirt";
-  if (beef >= 38 && r.chance(0.3 + temper * 0.12)) return "argue";
-  if (Math.min(hmOf(s, a).comp, hmOf(s, b).comp) < 45 && Math.max(ab[F], ba[F]) >= 30 && r.chance(0.65)) return "cry";
-  if ((BY[a].sc >= 4 || BY[b].sc >= 4) && ab[F] >= 38 && s.day >= 1 && s.day <= 3 && r.chance(0.45)) return "deal";
-  if (ab[F] >= 40 && r.chance(0.55)) return "gossip";
-  if (Math.max(ab[AT], ba[AT]) >= 60 && r.chance(0.35)) return "flirt";
-  return "bond";
+const ROOM_RECTS = [
+  ["hoh", 23, 0, 30, 8],
+  ["gym", 11, 10, 16, 15],
+  ["kitchen", 0, 0, 11, 10],
+  ["lounge", 11, 0, 23, 10],
+  ["bedroom", 0, 10, 11, 22],
+  ["garden", 0, 8, 36, 26],
+];
+const ROOM_NAME = { lounge: "lounge", kitchen: "kitchen", garden: "garden", bedroom: "bedroom", gym: "gym", hoh: "HoH lounge" };
+function roomAt(x, z) {
+  for (const [id, x0, z0, x1, z1] of ROOM_RECTS) if (x >= x0 && x < x1 && z >= z0 && z < z1) return id;
+  return "garden";
 }
 
-/** Choose who a gossip or scheme scene is about. */
-function gossipTarget(s, r, a, b, kind) {
-  const pool = inHouseIds(s).filter((x) => x !== a && x !== b);
-  let best = null, bestV = -1;
-  for (const x of pool) {
-    let v = rel(s, a, x)[BF] + rel(s, b, x)[BF] + rel(s, a, x)[SU] * 0.8 + r.int(25);
-    if (kind === "scheme") v = threatOf(s, x) + r.int(20);
-    if (x === ME) v += s.hm[0].fans >= 65 ? 12 : 4;
-    if (v > bestV) { bestV = v; best = x; }
+/**
+ * Stations: where you stand to do something. game is the client mini-game,
+ * dur the seconds it takes. Fix stations only matter during a sabotage.
+ */
+const STATIONS = {
+  jollof: { kind: "task", label: "Stir the jollof", room: "kitchen", x: 3.6, z: 1.45, f: Math.PI, game: "stir", dur: 5 },
+  plates: { kind: "task", label: "Wash the plates", room: "kitchen", x: 7.4, z: 1.45, f: Math.PI, game: "scrub", dur: 5 },
+  fridge: { kind: "task", label: "Restock the fridge", room: "kitchen", x: 10.1, z: 1.5, f: Math.PI, game: "tapall", dur: 5 },
+  money: { kind: "task", label: "Count the market money", room: "lounge", x: 16, z: 4.6, f: Math.PI, game: "order", dur: 5 },
+  aerial: { kind: "task", label: "Fix the TV aerial", room: "lounge", x: 21.7, z: 1.9, f: Math.PI, game: "dial", dur: 5 },
+  cushions: { kind: "task", label: "Arrange the cushions", room: "lounge", x: 13.3, z: 3.6, f: -Math.PI / 2, game: "tapall", dur: 4 },
+  crown: { kind: "task", label: "Polish the HoH crown", room: "hoh", x: 26.5, z: 3.3, f: Math.PI, game: "scrub", dur: 4 },
+  jacuzzi: { kind: "task", label: "Skim the jacuzzi", room: "hoh", x: 27, z: 7.2, f: Math.PI / 2, game: "tapall", dur: 5 },
+  weights: { kind: "task", label: "Rack the weights", room: "gym", x: 15.2, z: 11.5, f: Math.PI, game: "rhythm", dur: 5 },
+  laundry: { kind: "task", label: "Fold the laundry", room: "bedroom", x: 5.5, z: 11.4, f: Math.PI, game: "tapall", dur: 5 },
+  beds: { kind: "task", label: "Make the beds", room: "bedroom", x: 3.1, z: 15.4, f: -Math.PI / 2, game: "order", dur: 4 },
+  pool: { kind: "task", label: "Skim the pool", room: "garden", x: 20, z: 15.6, f: 0, game: "tapall", dur: 5 },
+  plantain: { kind: "task", label: "Water the plantain", room: "garden", x: 14.6, z: 23.8, f: Math.PI, game: "hold", dur: 4 },
+  sweep: { kind: "task", label: "Sweep the compound", room: "garden", x: 24.5, z: 12.6, f: Math.PI / 4, game: "scrub", dur: 5 },
+  gen: { kind: "fix", label: "Fix the gen", room: "garden", x: 34.2, z: 15, f: Math.PI / 2, game: "pull", dur: 3 },
+  gas1: { kind: "fix", label: "Close the gas valve", room: "kitchen", x: 0.95, z: 3, f: -Math.PI / 2, game: "hold", dur: 2 },
+  gas2: { kind: "fix", label: "Close the gas valve", room: "garden", x: 34.9, z: 22, f: Math.PI / 2, game: "hold", dur: 2 },
+  bell: { kind: "bell", label: "Ring Mama Eye's bell", room: "lounge", x: 18.6, z: 6.4, f: Math.PI, game: null, dur: 0 },
+};
+const TASK_IDS = Object.keys(STATIONS).filter((k) => STATIONS[k].kind === "task");
+/** Chores anyone watching can see finished (a tick pops over your head). Saboteurs can only fake them. */
+const VISUAL = new Set(["jollof", "weights", "sweep", "pool", "plantain"]);
+const TASKS_EACH = 7;
+
+/** Where everyone stands when a round starts or a meeting ends. */
+const SPAWN = [
+  [13.2, 7.2], [14.6, 8.6], [16, 7.2], [17.4, 8.6], [18.8, 7.2],
+  [20.2, 8.6], [21.4, 7.2], [13.2, 9.2], [16, 9.3], [19.2, 9.3],
+];
+/** Meeting marks: the lounge sofas, the armchairs, and two standing spots. */
+const SEATS = [
+  [13.6, 1.35, 0], [14.8, 1.35, 0], [16, 1.35, 0], [17.2, 1.35, 0], [18.4, 1.35, 0],
+  [12.35, 2.9, Math.PI / 2], [12.35, 4.2, Math.PI / 2], [21.1, 3, -Math.PI / 2], [21.1, 5.2, -Math.PI / 2], [16, 5.5, Math.PI],
+];
+// ---------------------------------------------------------------------------
+// Lobby: seats, names, looks, settings, and starting a round.
+// ---------------------------------------------------------------------------
+
+function newPlayer(id, bot) {
+  return {
+    id, name: "Guest", look: null, bot: !!bot, on: true, ctl: bot ? "b" : "h", away: 0, hello: !!bot,
+    x: SPAWN[0][0], z: SPAWN[0][1], f: 0, mv: 0, at: 0, tp: 0,
+    alive: true, role: null, tasks: [], cd: 0, bell: 1, act: null, voted: null, deadAt: 0, known: false, ejected: false,
+    spec: false, lastChat: 0, b: null,
+  };
+}
+
+function freshState(ids, now) {
+  return {
+    v: 2, ver: 1, rng: hash(ids.join(",") + ":" + (now || 0)) || 1,
+    phase: "LOBBY", now: now || 0, ends: 0, round: 0, pub: false, host: ids[0] || null,
+    opts: { ...OPTS_DEFAULT }, fillAt: 0,
+    ps: ids.map((id) => newPlayer(id, false)),
+    bodies: [], sab: null, sabAt: 0, bellAt: 0, meet: null, res: null, end: null,
+    feed: [], fid: 0, moved: false, cid: 0, stats: {},
+  };
+}
+
+function freeLook(s, prefer) {
+  const used = new Set(s.ps.filter((p) => p.look).map((p) => p.look));
+  if (prefer && LOOKS.includes(prefer) && !used.has(prefer)) return prefer;
+  return LOOKS.find((l) => !used.has(l)) || "pf";
+}
+
+function cleanName(raw) {
+  let n = String(raw || "").replace(/[^\p{L}\p{N} ._'-]/gu, "").replace(/\s+/g, " ").trim().slice(0, 14);
+  if (n.length < 2) return null;
+  if (hasBadWord(n)) return null;
+  return n;
+}
+function uniqueName(s, name, self) {
+  const taken = new Set(s.ps.filter((p) => p !== self && p.hello).map((p) => p.name.toLowerCase()));
+  if (!taken.has(name.toLowerCase())) return name;
+  for (let i = 2; i < 20; i++) { const n = `${name.slice(0, 12)} ${i}`; if (!taken.has(n.toLowerCase())) return n; }
+  return name;
+}
+
+function lobbyHumans(s) { return s.ps.filter((p) => !p.bot && p.hello); }
+
+function hello(s, p, a) {
+  const first = !s.ps.some((q) => q.hello && !q.bot);
+  p.name = uniqueName(s, cleanName(a.name) || p.name, p);
+  p.look = freeLook(s, a.look);
+  p.hello = true;
+  if (first && typeof a.room === "string") s.pub = a.room.startsWith("q-");
+  if (!s.host || !pOf(s, s.host) || pOf(s, s.host).bot) s.host = p.id;
+  if (s.phase === "LOBBY" && s.pub && !s.fillAt) s.fillAt = s.now + T.fill;
+  if (s.phase === "LOBBY" && s.pub && lobbyHumans(s).length >= meta.maxPlayers) s.fillAt = Math.min(s.fillAt, s.now + T.fillFull);
+  feed(s, `${p.name} joined the house.`, "join");
+}
+
+function setOpts(s, a) {
+  for (const k of Object.keys(OPTS_ALLOWED)) if (k in a && OPTS_ALLOWED[k].includes(a[k])) s.opts[k] = a[k];
+}
+
+/** Fill empty seats with AI housemates, deal roles and chores, and open the round. */
+function startRound(s) {
+  s.rng = (hash(s.ps.map((p) => p.id).join(",") + ":" + s.now + ":" + s.round) ^ s.rng) >>> 0 || 1;
+  // Anyone who never said hello (closed the tab on the menu) does not play.
+  s.ps = s.ps.filter((p) => p.hello && p.on);
+  for (const p of s.ps) { p.spec = false; p.bot = !!p.bot; }
+  const target = Math.max(s.opts.fill, s.ps.length);
+  const names = new Set(s.ps.map((p) => p.name.toLowerCase()));
+  for (const look of BOT_ORDER) {
+    if (s.ps.length >= Math.min(target, meta.maxPlayers)) break;
+    if (s.ps.some((p) => p.look === look)) continue;
+    const bot = newPlayer("ai-" + look, true);
+    bot.look = look;
+    let nm = CAST[look].name;
+    if (names.has(nm.toLowerCase())) nm = nm + " (AI)";
+    bot.name = nm; names.add(nm.toLowerCase());
+    s.ps.push(bot);
   }
+  const n = s.ps.length;
+  const nS = s.opts.sabs || (n <= 6 ? 1 : 2);
+  const order = R.shuffle(s, s.ps.map((p) => p.id));
+  const sabs = new Set(order.slice(0, Math.min(nS, Math.max(1, Math.floor((n - 1) / 2)))));
+  const spots = R.shuffle(s, SPAWN);
+  s.ps.forEach((p, i) => {
+    p.role = sabs.has(p.id) ? "S" : "H";
+    p.alive = true; p.known = false; p.ejected = false; p.deadAt = 0;
+    p.tasks = R.shuffle(s, TASK_IDS).slice(0, TASKS_EACH).map((id) => ({ id, done: false }));
+    p.x = spots[i % spots.length][0]; p.z = spots[i % spots.length][1]; p.f = Math.PI; p.tp += 1; p.at = s.now;
+    p.bell = 1; p.voted = null; p.act = null; p.mv = 0;
+    p.b = p.ctl === "b" ? brainNew() : null;
+  });
+  s.round += 1;
+  s.bodies = []; s.sab = null; s.meet = null; s.res = null; s.end = null; s.feed = []; s.flash = [];
+  s.phase = "INTRO"; s.ends = s.now + T.intro;
+  s.stats = { strikes: {}, tasks: {}, meetings: 0 };
+  feed(s, `Mama Eye: Housemates, ${sabs.size === 1 ? "one of you is" : sabs.size + " of you are"} not who you say you are.`, "sys");
+}
+
+/** Intro over: everyone may move, and the Saboteurs' clocks start. */
+function openPlay(s) {
+  s.phase = "PLAY"; s.ends = 0; s.playAt = s.now;
+  for (const p of s.ps) if (isSab(p)) p.cd = s.now + T.firstKill;
+  s.sabAt = s.now + T.sabFirst;
+  s.bellAt = s.now + T.bellLock;
+}
+
+/** Back to the lobby with the same people (AI housemates leave). */
+function toLobby(s) {
+  s.ps = s.ps.filter((p) => !p.bot && p.on);
+  for (const p of s.ps) {
+    p.role = null; p.alive = true; p.tasks = []; p.spec = false; p.ctl = "h"; p.b = null; p.voted = null; p.act = null; p.known = false; p.ejected = false;
+  }
+  if (!s.ps.some((p) => p.id === s.host)) s.host = s.ps[0] ? s.ps[0].id : null;
+  s.phase = "LOBBY"; s.ends = 0; s.bodies = []; s.sab = null; s.meet = null; s.res = null; s.end = null;
+  s.fillAt = s.pub && s.ps.length ? s.now + T.fill : 0;
+  s.feed = [];
+}
+// ---------------------------------------------------------------------------
+// Play: moving, chores, strikes, reports, the bell, sabotage, vision, winning.
+// ---------------------------------------------------------------------------
+
+function visionOf(s, p) {
+  if (!p.alive || p.spec) return Infinity;
+  if (isSab(p)) return VISION.S;
+  return s.sab && s.sab.k === "nepa" ? VISION.nepa : VISION.H;
+}
+
+/** Can `viewer` see the point (x, z)? Walls cut sight: other rooms need to be close. */
+function seesPoint(s, viewer, x, z) {
+  const r = visionOf(s, viewer);
+  if (r === Infinity) return true;
+  const d = Math.hypot(viewer.x - x, viewer.z - z);
+  if (d > r) return false;
+  return d <= VISION.close || roomAt(viewer.x, viewer.z) === roomAt(x, z);
+}
+function sees(s, viewer, other) {
+  if (viewer.id === other.id) return true;
+  if (!other.alive && viewer.alive) return false; // ghosts are invisible to the living
+  return seesPoint(s, viewer, other.x, other.z);
+}
+
+function checkMove(s, p, a) {
+  if (s.phase !== "PLAY") return "not now";
+  if (p.spec) return "spectating";
+  const { x, z } = a;
+  if (typeof x !== "number" || typeof z !== "number" || !Number.isFinite(x) || !Number.isFinite(z)) return "bad move";
+  if (!inBounds(x, z)) return "bad move";
+  if (p.alive && !walkable(x, z)) return "bad move";
+  const dt = Math.max(0.05, ((a._now || s.now) - (p.at || 0)) / 1000);
+  const d = Math.hypot(x - p.x, z - p.z);
+  const limit = (p.alive ? SPEED.maxHuman : SPEED.maxHuman * 1.6) * Math.min(dt, 2) + SPEED.slack;
+  if (d > limit) return "bad move";
+  return null;
+}
+function applyMove(s, p, a) {
+  const d = Math.hypot(a.x - p.x, a.z - p.z);
+  p.x = Math.round(a.x * 100) / 100; p.z = Math.round(a.z * 100) / 100;
+  if (typeof a.f === "number" && Number.isFinite(a.f)) p.f = Math.round(a.f * 100) / 100;
+  p.mv = d > 0.01 ? 1 : 0;
+  p.at = a._now || s.now;
+  if (p.act && dist(p, STATIONS[p.act.id]) > RANGE.use + 0.6) p.act = null;
+  s.moved = true;
+}
+
+function nearStation(p, id, range) { const st = STATIONS[id]; return st && Math.hypot(p.x - st.x, p.z - st.z) <= (range || RANGE.use); }
+function myTask(p, id) { return p.tasks.find((t) => t.id === id) || null; }
+
+function stationOpen(s, p, id) {
+  const st = STATIONS[id];
+  if (!st) return "no such station";
+  if (st.kind === "task") {
+    const t = myTask(p, id);
+    if (!t) return "That's not one of your chores.";
+    if (t.done) return "Already done.";
+    return null;
+  }
+  if (st.kind === "fix") {
+    if (!p.alive) return "Ghosts can't fix that.";
+    if (!s.sab) return "Nothing to fix.";
+    if (id === "gen" && s.sab.k !== "nepa") return "The gen is fine.";
+    if ((id === "gas1" || id === "gas2") && (s.sab.k !== "gas" || s.sab.fixed.includes(id))) return "This valve is fine.";
+    return null;
+  }
+  return "Use the bell button.";
+}
+
+function finishStation(s, p, id) {
+  const st = STATIONS[id];
+  p.act = null;
+  s.dirty = true;
+  if (st.kind === "task") {
+    const t = myTask(p, id);
+    t.done = true;
+    if (!isSab(p)) {
+      s.stats.tasks[p.id] = (s.stats.tasks[p.id] || 0) + 1;
+      if (VISUAL.has(id) && p.alive) {
+        const saw = living(s).filter((w) => w.id !== p.id && sees(s, w, p));
+        s.flash = (s.flash || []).filter((f) => s.now - f.at < 3000);
+        s.fl = (s.fl || 0) + 1;
+        s.flash.push({ i: s.fl, id: p.id, st: id, at: s.now, to: saw.map((w) => w.id) });
+        for (const w of saw) if (w.b) { w.b.sus[p.id] = Math.min(0, (w.b.sus[p.id] || 0)) - 25; w.b.clear[p.id] = id; }
+      }
+      checkWin(s);
+    }
+    return;
+  }
+  if (id === "gen") { s.sab = null; s.sabAt = Math.max(s.sabAt, s.now + T.sabCd); feed(s, `${p.name} fixed the gen. Light don come back!`, "fix"); return; }
+  s.sab.fixed.push(id);
+  if (s.sab.fixed.length >= 2) { s.sab = null; s.sabAt = Math.max(s.sabAt, s.now + T.sabCd); feed(s, "Both gas valves closed. The house can breathe.", "fix"); }
+}
+
+function taskBar(s) {
+  let all = 0, done = 0;
+  for (const p of playing(s)) if (!isSab(p)) for (const t of p.tasks) { all += 1; if (t.done) done += 1; }
+  return all ? done / all : 0;
+}
+
+function canStrike(s, p, target) {
+  if (s.phase !== "PLAY") return "not now";
+  if (!isSab(p) || !p.alive) return "You can't do that.";
+  if (s.now < p.cd) return "Not yet.";
+  if (!target || !target.alive || target.spec || isSab(target)) return "No target.";
+  if (dist(p, target) > RANGE.strike) return "Too far.";
+  return null;
+}
+function strike(s, p, target) {
+  s.dirty = true;
+  target.alive = false; target.deadAt = s.now; target.act = null;
+  s.bodies.push({ id: target.id, x: target.x, z: target.z, at: s.now, by: p.id });
+  p.cd = s.now + s.opts.kill * 1000;
+  s.stats.strikes[p.id] = (s.stats.strikes[p.id] || 0) + 1;
+  // Bots in sight may notice.
+  for (const w of living(s)) {
+    if (w.id === p.id || w.id === target.id || !w.b) continue;
+    if (sees(s, w, p) && R.chance(s, isSab(w) ? 1 : 0.7)) w.b.saw.push({ k: "strike", who: p.id, victim: target.id, room: roomAt(p.x, p.z), at: s.now });
+  }
+  checkWin(s);
+}
+
+function bodyNear(s, p) {
+  let best = null, bd = Infinity;
+  for (const b of s.bodies) { const d = Math.hypot(b.x - p.x, b.z - p.z); if (d <= RANGE.report && d < bd) { best = b; bd = d; } }
   return best;
 }
 
-function startScene(s, r, kind, a, b, room) {
-  const x = kind === "gossip" || kind === "scheme" ? gossipTarget(s, r, a, b, kind) : null;
-  const tpl = r.pick(SCENES[kind]);
-  const lines = tpl.map(([who, text]) => {
-    const sp = who === "A" ? a : who === "B" ? b : null;
-    return { w: sp, t: sp ? fill(s, r, text, sp, { x }) : text.replace(/\{x\}/g, x ? nameOf(s, x) : "") };
-  });
-  // Sometimes the first speaker opens in their own voice.
-  const own = sceneOpener(r, a, kind);
-  if (own) {
-    const first = { w: a, t: fill(s, r, own, a, { x }) };
-    if (kind === "gossip") lines[0] = first; else lines.unshift(first);
-  }
-  s.scid += 1;
-  const sc = { id: s.scid, k: kind, room, a, b, x, until: s.min + 30 + 10 * r.int(2), lines, heard: false, d: s.day };
-  s.scenes.push(sc);
-  for (const id of [a, b]) { const h = hmOf(s, id); h.sc = sc.id; h.with = id === a ? b : a; h.act = kind; h.watch = null; }
-  applyScene(s, r, sc);
-  if (kind === "argue" || kind === "kiss") gatherCrowd(s, r, sc);
-  return sc;
-}
-
-function applyScene(s, r, sc) {
-  const { a, b, x, k } = sc;
-  const A = hmOf(s, a), B = hmOf(s, b);
-  const others = inHouse(s).filter((h) => h.room === sc.room && h.id !== a && h.id !== b && !h.human && h.act !== "sleep");
-  if (k === "flirt") {
-    bump(s, a, b, RO, 5 + rel(s, a, b)[AT] / 12); bump(s, b, a, RO, 4 + rel(s, b, a)[AT] / 12);
-    A.fans = clamp(A.fans + 2); B.fans = clamp(B.fans + 2);
-    if (rel(s, a, b)[RO] >= 55 && rel(s, b, a)[RO] >= 55) makeShip(s, r, a, b, false);
-  } else if (k === "kiss") {
-    mutual(s, a, b, RO, 10);
-    const sh = makeShip(s, r, a, b, true);
-    A.fans = clamp(A.fans + 6); B.fans = clamp(B.fans + 6);
-    tweet(s, r, "kiss", a, b, sh.name);
-    logEv(s, `${A.name} and ${B.name} kissed in the ${ROOMS[sc.room].name}.`, "kiss");
-    // Jealousy.
-    for (const h of inHouse(s)) {
-      if (h.id === a || h.id === b) continue;
-      for (const [p, q] of [[a, b], [b, a]]) {
-        if (rel(s, h.id, p)[RO] >= 40) { bump(s, h.id, q, BF, 14); h.comp = clamp(h.comp - 10); if (h.human) note(s, `${A.name} and ${B.name} just kissed. Your heart...`, "love"); }
-      }
-    }
-    for (const w of others) remember(s, w.id, { k: "kiss", x: a, y: b, room: ROOMS[sc.room].name.toLowerCase() });
-  } else if (k === "argue") {
-    mutual(s, a, b, BF, 10); mutual(s, a, b, F, -8);
-    A.comp = clamp(A.comp - 9); B.comp = clamp(B.comp - 9);
-    A.fans = clamp(A.fans + 4); B.fans = clamp(B.fans + 4);
-    addBeef(s, a, b);
-    tweet(s, r, "fight", a, b);
-    logEv(s, `${A.name} and ${B.name} had a loud fight in the ${ROOMS[sc.room].name}.`, "fight");
-    for (const w of others) remember(s, w.id, { k: "fight", x: a, y: b, room: ROOMS[sc.room].name.toLowerCase() });
-    for (const h of [A, B]) {
-      const c = BY[h.id];
-      if (c.tp >= 4 && h.comp < 50 && r.chance(0.3)) strike(s, r, h.id, "threatening another housemate");
-    }
-    if (s.mission && s.mission.k === "fight" && !s.mission.done && s.mission.pair && s.mission.pair.includes(a) && s.mission.pair.includes(b)) completeMission(s, r);
-  } else if (k === "gossip") {
-    mutual(s, a, b, F, 5);
-    bump(s, a, x, BF, 5); bump(s, b, x, BF, 6);
-    bump(s, a, x, SU, 3); bump(s, b, x, SU, 4);
-    bump(s, b, x, TR, -5);
-    remember(s, b, { k: "gossip", x, src: a });
-    for (const w of others) if (r.chance(BY[w.id].ob * 0.06)) remember(s, w.id, { k: "overheard", x, src: a });
-  } else if (k === "deal") {
-    mutual(s, a, b, TR, 10);
-    s.prom[a + ">" + b] = "save"; s.prom[b + ">" + a] = "save";
-  } else if (k === "bond") {
-    mutual(s, a, b, F, 7); mutual(s, a, b, TR, 4);
-    if (BY[a].wt >= 4) B.fans = clamp(B.fans + 1), A.fans = clamp(A.fans + 2);
-  } else if (k === "cry") {
-    mutual(s, a, b, F, 8);
-    A.comp = clamp(A.comp + 14);
-    A.fans = clamp(A.fans + 3);
-  } else if (k === "scheme") {
-    s.plan.plant = s.plan.plant || x;
-    for (const w of others) if (r.chance(BY[w.id].ob * 0.05)) { remember(s, w.id, { k: "saw_scheme", x: a, y: b }); bump(s, w.id, a, SU, 18); bump(s, w.id, b, SU, 18); }
-  }
-}
-
-function endScene(s, sc) {
-  for (const id of [sc.a, sc.b]) {
-    const h = hmOf(s, id);
-    if (h && h.sc === sc.id) { h.sc = null; h.with = null; h.act = "idle"; }
-  }
-  for (const h of s.hm) if (h.watch === sc.id) { h.watch = null; h.act = "idle"; }
-}
-
-/** Every half hour, the house makes content. */
-function runScenes(s, r) {
-  const busy = new Set();
-  for (const sc of s.scenes) if (sc.until > s.min && sc.d === s.day) { busy.add(sc.a); busy.add(sc.b); }
-  for (const room of ROAM_ROOMS) {
-    const ppl = aiIn(s).filter((h) => h.room === room && !busy.has(h.id) && h.act !== "sleep");
-    if (ppl.length < 2) continue;
-    const pChance = room === "bedroom" ? 0.25 : 0.5;
-    if (!r.chance(pChance)) continue;
-    // Pick the most charged pair, with some randomness.
-    let best = null, bestV = -1;
-    for (let i = 0; i < ppl.length; i++) for (let j = i + 1; j < ppl.length; j++) {
-      const a = ppl[i].id, b = ppl[j].id, ab = rel(s, a, b), ba = rel(s, b, a);
-      const v = Math.max(ab[RO], ba[RO]) + Math.max(ab[BF], ba[BF]) + ab[F] * 0.4 + r.int(40) + (isSab(s, a) && isSab(s, b) ? 25 : 0);
-      if (v > bestV) { bestV = v; best = [a, b]; }
-    }
-    const present = inHouse(s).filter((h) => h.room === room && h.act !== "sleep").length;
-    const kind = pickSceneKind(s, r, best[0], best[1], room, present === 2);
-    // The one crying is whoever is lower on composure.
-    if (kind === "cry" && hmOf(s, best[1]).comp < hmOf(s, best[0]).comp) best.reverse();
-    startScene(s, r, kind, best[0], best[1], room);
-    busy.add(best[0]); busy.add(best[1]);
-  }
-}
-
-function threatOf(s, x) {
-  if (isSab(s, x)) return -100;
-  let t = 0;
-  for (const sab of s.sabs) {
-    if (hmOf(s, sab).out) continue;
-    const v = rel(s, x, sab);
-    if (v) t = Math.max(t, v[SU]);
-  }
-  if (x === ME) { if (s.gb.some((g) => /sab:|skim:/.test(g.tag))) t += 30; t += s.hm[0].sus * 2; }
-  const h = hmOf(s, x);
-  return t + (h ? h.fans / 6 : 0);
-}
-
-// ---------------------------------------------------------------------------
-// Clock
-// ---------------------------------------------------------------------------
-
-/** Advance one tick (10 game minutes). Returns an event kind if one is due. */
-function advance(s, r) {
-  s.min += TICK;
-  // Close finished scenes.
-  for (const sc of s.scenes) if (sc.until <= s.min && sc.d === s.day) endScene(s, sc);
-  s.scenes = s.scenes.filter((sc) => sc.until > s.min - 60 && sc.d === s.day);
-  if (s.min % 60 === 0) placeAI(s, r);
-  if (s.min % 30 === 0 && s.min < 1500) runScenes(s, r);
-  checkLies(s, r);
-  const due = (SCHEDULE[s.day] || []).find(([m, k]) => m <= s.min && !s.done[s.day + ":" + k]);
-  if (due) return due[1];
-  if (s.min >= DAY_END) return "sleep";
+function canSabotage(s, p, k) {
+  if (s.phase !== "PLAY") return "not now";
+  if (!isSab(p)) return "You can't do that.";
+  if (k !== "nepa" && k !== "gas") return "bad sabotage";
+  if (s.sab) return "A sabotage is already on.";
+  if (s.now < s.sabAt) return "Not yet.";
   return null;
 }
-
-function nextEventMin(s) {
-  const due = (SCHEDULE[s.day] || []).filter(([m, k]) => !s.done[s.day + ":" + k]).map(([m]) => m);
-  return due.length ? Math.min.apply(null, due) : DAY_END;
+function sabotage(s, p, k) {
+  s.sab = { k, at: s.now, ends: k === "gas" ? s.now + T.gas : 0, fixed: [], by: p.id };
+  s.sabAt = s.now + T.sabCd;
+  feed(s, k === "nepa" ? "NEPA has taken light! Fix the gen in the garden." : "Gas leak! Close both valves before the house fills up!", "sab");
 }
 
-function newDay(s, r) {
-  // Overnight: everyone sleeps it off a little.
-  for (const h of inHouse(s)) {
-    h.comp = clamp(h.comp + 12);
-    if (h.human) { h.energy = 10; if (h.acts < 3) { h.fans = clamp(h.fans - 4); } h.acts = 0; }
-    else { if (h.fans > 52 && s.scenes.filter((sc) => sc.a === h.id || sc.b === h.id).length === 0) h.fans = clamp(h.fans - 3); }
-  }
-  s.day += 1;
-  s.min = DAY_START;
-  s.scenes = [];
-  for (const h of inHouse(s)) { h.sc = null; h.with = null; }
-  if (s.hm[0].fans < 38 && !s.hm[0].out) tweet(s, r, "boring", ME);
-  placeAI(s, r);
-  if (!s.hm[0].out) { s.hm[0].room = "bedroom"; }
+function checkWin(s) {
+  if (s.phase === "END" || s.phase === "LOBBY") return;
+  const live = living(s);
+  const S = live.filter(isSab).length, H = live.length - S;
+  if (S === 0) return endGame(s, "H", "Every Saboteur is out of the house.");
+  if (S >= H) return endGame(s, "S", "The Saboteurs took over the house.");
+  if (taskBar(s) >= 1) return endGame(s, "H", "The house finished every chore.");
 }
 
-// ---------------------------------------------------------------------------
-// Lies catch up with you
-// ---------------------------------------------------------------------------
+function endGame(s, win, why) {
+  s.phase = "END"; s.ends = s.now + T.endBack; s.sab = null; s.meet = null;
+  s.end = { win, why, at: s.now };
+  feed(s, why, "end");
+}
 
-function checkLies(s, r) {
-  if (s.min % 60 !== 0) return;
-  for (const L of s.lies) {
-    if (L.exposed) continue;
-    const to = hmOf(s, L.to), about = hmOf(s, L.about);
-    if (!to || !about || to.out || about.out) continue;
-    // They compare notes when they are together and on speaking terms.
-    const together = to.room === about.room;
-    const talk = rel(s, L.to, L.about)[F] + rel(s, L.to, L.about)[TR] * 0.5;
-    const p = (together ? 0.12 : 0.02) + talk / 900 + (BY[L.to].ob + BY[L.about].ob) * 0.006;
-    if (r.chance(p)) {
-      L.exposed = true;
-      bump(s, L.to, ME, TR, -30); bump(s, L.about, ME, TR, -25);
-      bump(s, L.to, ME, BF, 14); bump(s, L.about, ME, BF, 20);
-      bump(s, L.to, L.about, BF, -10);
-      s.hm[0].fans = clamp(s.hm[0].fans + 3);
-      note(s, `Exposed! ${nameOf(s, L.to)} and ${nameOf(s, L.about)} compared notes. Your lie about ${nameOf(s, L.about)} is out.`, "bad");
-      logEv(s, `${nameOf(s, L.to)} and ${nameOf(s, L.about)} exposed ${s.hm[0].name}'s lie.`, "lie");
-      tweet(s, r, "youbad", ME);
-    }
-  }
+/** Every tick while playing: sabotage clocks and dropped players. */
+function tickPlay(s) {
+  if (s.sab && s.sab.k === "gas" && s.now >= s.sab.ends) endGame(s, "S", "The gas leak emptied the house. Saboteurs win.");
 }
 // ---------------------------------------------------------------------------
-// The player's moves (interaction wheel)
+// House meetings: chat, votes, and the eviction.
 // ---------------------------------------------------------------------------
 
-/** What the player says for each move. */
-const SAY = {
-  chat: ["How far? How is the house treating you?", "Talk to me. What's the gist today?", "You good? You look like you've been thinking.", "Abeg, how was your night? You look like you didn't sleep.", "Tell me something nobody in this house knows about you.", "What's the vibe today? I'm bored."],
-  joke: ["Why did the jollof go to school? To get more flavour. Hahaha!", "If Mama Eye was a person, she'd be that auntie at every party.", "Tobi's chain is so heavy, it has its own Wi-Fi.", "They said this house has no internet. That's why everybody is connecting.", "My mother said I'd never be on TV. Mummy, look at me now!", "Mama Eye sees everything. Mama Eye, please, have you seen my slippers?"],
-  compliment: ["Your outfit today? Unmatched.", "You have the best energy in this house, honestly.", "I like how you carry yourself. Real class.", "You walk like you own this house.", "Honestly, your laugh makes this place better."],
-  deep: ["Can we talk for real? No cameras, no games.", "What made you come here? The real reason.", "Who are you when nobody is watching?", "Do you ever think about just walking out?", "What would you really do with the money?"],
-  hug: ["Come here, big hug.", "You look like you need a hug.", "Come here. You look like you've had a day."],
-  gift: ["I saved you a plate of jollof. The good part.", "Small something for you. Don't say I never did anything.", "I bought this with my hustle money. For you.", "You've been good to me. Take this."],
-  flirt: ["Has anybody told you that you look dangerous today?", "I keep finding reasons to sit next to you. Funny.", "If this house had a crush list, you'd be top.", "Stop smiling like that. You're distracting me.", "I came here for the money. Now I'm confused."],
-  askout: ["Let's stop pretending. Be my person in this house.", "I like you. For real. Let's make it official.", "I don't want to play games with you. Be mine."],
-  kiss: ["Come here..."],
-  breakup: ["I think we should just be friends.", "This thing between us... it's not working."],
-  gist: ["Between us... {x} {claim}.", "I shouldn't tell you this, but {x} {claim}."],
-  setup: ["I heard {x} talking about you. It wasn't sweet.", "You didn't hear it from me, but {x} is not your friend."],
-  asksave: ["Wednesday is coming. Can I count on your save?", "If I'm in trouble, will you save me?"],
-  squad: ["You, me, and a few real ones. Let's run this house.", "Let's form a squad. We protect each other.", "I trust you. Let's watch each other's backs."],
-  swear: ["I swear, I've got your back. No matter what.", "Loyalty. You have mine.", "Whatever happens on Wednesday, I'm with you."],
-  bribe: ["There's something small in it for you if you save me.", "Let's help each other. I'll make it worth your while."],
-  receipt: ["I saw it with my own eyes. {x} {receipt}.", "Receipts don't lie. {x} {receipt}."],
-  shade: ["Some people in this house are all noise, no sense.", "Nice outfit. Did it come with a refund?", "Loud people are usually empty. Just saying.", "Some people are only loud because nobody listens to them.", "That outfit is brave. Very brave."],
-  argue: ["You need to stop talking about me!", "I'm tired of your attitude, honestly!", "Say it to my face! Go on!", "I've been quiet long enough!", "Who do you think you are, talking to me like that?"],
-  accuse: ["I know what you are. You're a Saboteur.", "Stop pretending. You work for The Whisper."],
-  apologize: ["I'm sorry. I was wrong.", "My bad. I shouldn't have done that.", "I messed up. I know. I'm sorry."],
-  peace: ["Let's end this. Peace?", "No more wahala between us. Truce?", "We're both tired of this. Let's end it."],
-};
+/**
+ * One-tap lines. {name} and {room} are filled from the action. Shared with the
+ * client by index, so only append to this list.
+ */
+const QUICK = [
+  "Where was the body?",
+  "I was in the {room}.",
+  "I saw {name} near the body!",
+  "{name} is sus.",
+  "{name} was with me. Clear.",
+  "I was doing my chores.",
+  "Skip am. No evidence.",
+  "Vote {name}!",
+  "Na lie!",
+  "No be me o!",
+  "Who called this meeting?",
+  "I fixed the gen.",
+  "Watch the task bar.",
+  "Ehen?! Explain yourself, {name}.",
+  "I saw {name} in the {room}.",
+  "Trust me abeg.",
+];
+const QUICK_NEEDS = QUICK.map((q) => ({ name: q.includes("{name}"), room: q.includes("{room}") }));
 
-function canTalk(s, t, act, a) {
-  const me = s.hm[0];
-  const h = hmOf(s, t);
-  if (!h || h.human || h.out) return "They are not in the house.";
-  if (me.out) return "You are no longer in the house.";
-  if (h.room !== me.room) return `${h.name} is not in this room.`;
-  const def = ACTS[act];
-  if (!def) return "Unknown move.";
-  if (me.energy < def.e) return "You're out of Social Energy for today.";
-  if (def.coins && me.coins < def.coins) return `You need ${def.coins} coins.`;
-  if (me.comp < 30 && (act === "deep" || act === "apologize" || act === "peace")) return "You're too rattled for that right now. Rest first.";
-  if (def.x) {
-    if (!a.x || a.x === t || !hmOf(s, a.x) || hmOf(s, a.x).out) return "Pick who this is about.";
-    if (act === "gist" && !CLAIMS[a.claim]) return "Pick what to say.";
-    if (act === "receipt" && !receiptAbout(s, a.x)) return `You have no receipt on ${nameOf(s, a.x)}.`;
+/** Whole words that are starred, and stems starred inside any word. Names like Dickson or Shitta stay. */
+const BAD = [
+  "fuk", "fck", "shit", "bitch", "dick", "pussy", "asshole", "bastard", "slut", "fag", "retard", "rape", "porn",
+  "ashawo", "ashewo", "olosho", "oloshi", "dickhead", "mf", "toto", "prick", "wanker", "twat", "penis", "vagina",
+].map(collapse);
+const BAD_STEM = ["fuck", "cunt", "nigg", "fagot", "motherf", "bitch", "whore"].map(collapse);
+const LEET = { "0": "o", "1": "i", "3": "e", "4": "a", "5": "s", "7": "t", "@": "a", "$": "s", "!": "i" };
+function collapse(w) { return w.replace(/(.)\1+/g, "$1"); }
+function norm(w) { return collapse(w.toLowerCase().split("").map((c) => LEET[c] || c).join("").replace(/[^a-z]/g, "")); }
+function badWord(w) { const n = norm(w); if (n.length < 2) return false; return BAD.includes(n) || BAD.includes(n.replace(/s$/, "")) || BAD_STEM.some((b) => n.includes(b)); }
+function hasBadWord(text) { return String(text).split(/\s+/).some(badWord); }
+/** Swear filter and link stripper for typed chat. */
+function cleanChat(raw) {
+  let t = String(raw || "").replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim().slice(0, 100);
+  t = t.replace(/\b(https?:\/\/|www\.)\S+/gi, "[link]").replace(/\b\S+\.(com|ng|net|org|io|ly|co|me|xyz|app)\b\S*/gi, "[link]");
+  t = t.split(" ").map((w) => (badWord(w) ? "*".repeat(Math.min(6, w.length)) : w)).join(" ");
+  return t;
+}
+
+function startMeeting(s, by, kind, bodyId) {
+  s.stats.meetings += 1;
+  const reporter = pOf(s, by);
+  const body = s.bodies.find((x) => x.id === bodyId);
+  const where = body ? roomAt(body.x, body.z) : reporter ? roomAt(reporter.x, reporter.z) : null;
+  // Everyone learns who is dead; bodies are cleared away.
+  for (const p of s.ps) if (!p.alive) p.known = true;
+  s.bodies = [];
+  if (s.sab && s.sab.k === "nepa") s.sab = null;
+  const order = R.shuffle(s, living(s).map((p) => p.id));
+  order.forEach((id, i) => { const p = pOf(s, id); const seat = SEATS[i % SEATS.length]; p.x = seat[0]; p.z = seat[1]; p.f = seat[2]; p.tp += 1; p.act = null; p.mv = 0; p.at = s.now; });
+  for (const p of s.ps) p.voted = null;
+  s.meet = { by, kind, body: bodyId || null, room: where, at: s.now, chat: [], seats: order };
+  s.phase = "MEET"; s.ends = s.now + s.opts.discuss * 1000;
+  feed(s, kind === "body" ? `${reporter ? reporter.name : "Someone"} found ${nameOf(s, bodyId)}'s body!` : `${reporter ? reporter.name : "Someone"} rang Mama Eye's bell!`, "meet");
+  botsPlanMeeting(s);
+}
+function nameOf(s, id) { const p = pOf(s, id); return p ? p.name : "someone"; }
+
+function chatLine(s, p, text, extra) {
+  s.dirty = true;
+  s.cid += 1;
+  s.meet.chat.push(Object.assign({ i: s.cid, w: p.id, t: text, g: p.alive ? 0 : 1, at: s.now }, extra || {}));
+  if (s.meet.chat.length > 60) s.meet.chat.splice(0, s.meet.chat.length - 60);
+  p.lastChat = s.now;
+}
+
+function checkChat(s, p, a) {
+  if (s.phase !== "MEET" && s.phase !== "VOTE") return "Chat opens at House Meetings.";
+  if (p.spec) return "spectating";
+  if (s.now - (p.lastChat || 0) < 1200) return "Slow down small.";
+  if (a.q !== undefined) {
+    if (!Number.isInteger(a.q) || a.q < 0 || a.q >= QUICK.length) return "bad line";
+    const need = QUICK_NEEDS[a.q];
+    if (need.name && !(typeof a.who === "string" && pOf(s, a.who))) return "Pick who.";
+    if (need.room && !(typeof a.room === "string" && ROOM_NAME[a.room])) return "Pick where.";
+    return null;
   }
-  if (act === "breakup" && !findShip(s, ME, t)) return "You're not in a ship with them.";
-  if (act === "squad" && s.squads.some((q) => q.members.includes(ME) && q.members.includes(t))) return "Already in your squad.";
+  if (typeof a.text !== "string" || !a.text.trim()) return "Say something.";
+  if (a.text.length > 140) return "Too long.";
   return null;
 }
-
-function receiptAbout(s, x) { return s.gb.find((g) => g.k === "receipt" && g.about.includes(x)); }
-
-/** Is a claim about x, told to t, actually true? Lies are measured against reality. */
-function claimTrue(s, claim, x, t) {
-  const v = rel(s, x, t);
-  if (claim === "likes") return v[RO] >= 40;
-  if (claim === "hates") return v[BF] >= 40 || v[F] < 20;
-  if (claim === "fake") return isSab(s, x) || v[F] < 25;
-  if (claim === "sab") return isSab(s, x);
-  if (claim === "using") return v[F] < 30 && v[RO] < 40;
-  return false;
+function applyChat(s, p, a) {
+  if (a.q !== undefined) {
+    const text = QUICK[a.q].replace(/\{name\}/g, a.who ? nameOf(s, a.who) : "").replace(/\{room\}/g, a.room ? ROOM_NAME[a.room] : "");
+    chatLine(s, p, text, { q: a.q, about: a.who || null });
+  } else {
+    const text = cleanChat(a.text);
+    if (!text) return;
+    chatLine(s, p, text);
+  }
+  if (p.alive) botsHear(s, s.meet.chat[s.meet.chat.length - 1]);
 }
 
-function outcomeOf(score) { return score >= 60 ? "good" : score >= 36 ? "meh" : "bad"; }
+function checkVote(s, p, a) {
+  if (s.phase !== "VOTE") return "Voting has not started.";
+  if (!p.alive || p.spec) return "Only living housemates vote.";
+  if (p.voted) return "You already voted.";
+  if (a.who !== "skip") { const t = pOf(s, a.who); if (!t || !t.alive || t.spec) return "Pick a living housemate."; }
+  return null;
+}
+function applyVote(s, p, who) {
+  s.dirty = true;
+  p.voted = who;
+  if (living(s).every((q) => q.voted)) s.ends = Math.min(s.ends, s.now + 1500);
+}
 
-function talk(s, r, a) {
-  const me = s.hm[0];
-  const t = a.who;
-  const h = hmOf(s, t);
-  const c = BY[t];
-  const act = a.act;
-  const v = rel(s, t, ME);
-  const noise = () => r.int(31) - 15;
-  const fx = [];
-  const lines = [];
-  const x = a.x;
-  me.energy -= ACTS[act].e;
-  if (ACTS[act].coins) me.coins -= ACTS[act].coins;
-  me.acts += 1;
-  s.eye += 1;
+function openVote(s) { s.phase = "VOTE"; s.ends = s.now + s.opts.vote * 1000; botsPlanVotes(s); }
 
-  const my = r.pick(SAY[act] || ["..."]).replace(/\{x\}/g, x ? nameOf(s, x) : "").replace(/\{claim\}/g, a.claim ? CLAIMS[a.claim] : "")
-    .replace(/\{receipt\}/g, x ? receiptText(s, x) : "");
-  lines.push({ w: ME, t: my });
+function closeVote(s) {
+  const tally = {};
+  let skips = 0;
+  for (const p of living(s)) {
+    if (!p.voted || p.voted === "skip") { skips += 1; continue; }
+    (tally[p.voted] = tally[p.voted] || []).push(p.id);
+  }
+  let top = null, topN = 0, tie = false;
+  for (const [id, list] of Object.entries(tally)) {
+    if (list.length > topN) { top = id; topN = list.length; tie = false; } else if (list.length === topN) tie = true;
+  }
+  let out = null;
+  if (top && !tie && topN > skips) out = top;
+  s.res = { out, tally, skips, tie: !!tie && topN > 0, role: null, at: s.now };
+  if (out) {
+    const p = pOf(s, out);
+    p.alive = false; p.ejected = true; p.known = true; p.deadAt = s.now; p.act = null;
+    s.res.role = p.role;
+    feed(s, `${p.name} was evicted.`, "evict");
+  } else feed(s, tie ? "It's a tie. Nobody leaves." : "The house skipped. Nobody leaves.", "evict");
+  s.phase = "RESULT"; s.ends = s.now + T.result;
+}
 
-  if (h.act === "sleep") {
-    lines.push({ w: t, t: REPLY.refuse.asleep[0] });
-    me.energy += ACTS[act].e; if (ACTS[act].coins) me.coins += ACTS[act].coins;
-    s.last = { n: s.nid + 1, who: t, act, out: "meh", lines, fx: ["They're asleep."] };
+/** After the reveal: win check, then everyone back to the lounge and on with it. */
+function afterResult(s) {
+  s.meet = null;
+  checkWin(s);
+  if (s.phase === "END") return;
+  const spots = R.shuffle(s, SPAWN);
+  living(s).forEach((p, i) => { p.x = spots[i % spots.length][0]; p.z = spots[i % spots.length][1]; p.f = Math.PI; p.tp += 1; p.at = s.now; });
+  for (const p of s.ps) if (isSab(p)) p.cd = s.now + s.opts.kill * 1000;
+  s.sabAt = Math.max(s.sabAt, s.now + T.sabCd / 2);
+  s.bellAt = s.now + T.bellLock;
+  s.res = null;
+  s.phase = "PLAY"; s.ends = 0;
+}
+// ---------------------------------------------------------------------------
+// AI housemates. They only know what they have seen or heard: bots never read
+// roles they should not know. They walk the same grid humans do.
+// ---------------------------------------------------------------------------
+
+function brainNew() {
+  return { goal: null, gk: null, path: [], until: 0, doing: null, seen: {}, saw: [], sus: {}, clear: {}, plan: [], voteAt: 0, hunt: null, rethink: 0, reportBody: null, reportAt: 0, rooms: [], defended: 0, idleUntil: 0, vouched: {} };
+}
+
+function setGoal(s, p, xz, key) {
+  const b = p.b;
+  b.path = findPath([p.x, p.z], xz);
+  b.goal = xz; b.gk = key; b.doing = null;
+}
+
+function stepAlong(s, p, dt) {
+  const b = p.b;
+  if (!b.path.length) { p.mv = 0; return true; }
+  let left = SPEED.walk * dt;
+  while (left > 0 && b.path.length) {
+    const [tx, tz] = b.path[0];
+    const dx = tx - p.x, dz = tz - p.z, d = Math.hypot(dx, dz);
+    if (d <= left) { p.x = tx; p.z = tz; b.path.shift(); left -= d; if (d > 0.001) p.f = Math.atan2(dx, dz); }
+    else { p.x += (dx / d) * left; p.z += (dz / d) * left; p.f = Math.atan2(dx, dz); left = 0; }
+  }
+  p.x = Math.round(p.x * 100) / 100; p.z = Math.round(p.z * 100) / 100; p.f = Math.round(p.f * 100) / 100;
+  p.mv = 1; p.at = s.now; s.moved = true;
+  return !b.path.length;
+}
+
+/** Pick what to do next: a chore, a fake chore, or a wander. */
+function nextChore(s, p) {
+  const b = p.b;
+  const open = p.tasks.filter((t) => !t.done);
+  if (open.length && R.chance(s, isSab(p) ? 0.75 : 0.8)) {
+    // Housemates like company: sometimes pick a chore in a room where people are.
+    if (!isSab(p) && R.chance(s, 0.35)) {
+      const busy = new Set(Object.values(b.seen).filter((v) => s.now - v.at < 8000).map((v) => v.room));
+      const social = open.filter((t) => busy.has(STATIONS[t.id].room));
+      if (social.length) { const id = R.pick(s, social).id; setGoal(s, p, [STATIONS[id].x, STATIONS[id].z], "task:" + id); return; }
+    }
+    // Nearest of a couple of random picks: feels purposeful without being a robot.
+    const picks = R.shuffle(s, open).slice(0, 2).map((t) => t.id);
+    picks.sort((a, c) => Math.hypot(STATIONS[a].x - p.x, STATIONS[a].z - p.z) - Math.hypot(STATIONS[c].x - p.x, STATIONS[c].z - p.z));
+    const id = picks[0];
+    setGoal(s, p, [STATIONS[id].x, STATIONS[id].z], "task:" + id);
     return;
   }
+  const id = R.pick(s, Object.keys(STATIONS));
+  const st = STATIONS[id];
+  setGoal(s, p, nearestFree(st.x + R.range(s, -1.5, 1.5), st.z + R.range(s, -1.5, 1.5)), "wander");
+}
 
-  const cb = callbackFor(s, r, t, act);
-  let score = 50;
-  let romantic = false;
-  const witnesses = aiIn(s).filter((w) => w.room === me.room && w.id !== t && w.act !== "sleep");
-  switch (act) {
-    case "chat": score = 40 + v[F] * 0.4 + v[TR] * 0.2 - v[BF] * 0.5 + noise(); break;
-    case "joke": score = 28 + c.wt * 8 + v[F] * 0.3 - v[BF] * 0.4 + noise(); break;
-    case "compliment": score = 34 + c.fl * 4 + v[F] * 0.3 + v[RO] * 0.2 - v[BF] * 0.4 - c.sc * 3 + noise(); break;
-    case "deep": score = v[TR] * 0.8 + v[F] * 0.35 + noise(); break;
-    case "hug": score = v[F] * 0.7 + v[RO] * 0.3 + 12 - v[BF] + noise(); break;
-    case "gift": score = 52 + v[F] * 0.3 - v[BF] * 0.4 + noise(); break;
-    case "flirt": score = v[AT] * 0.6 + v[RO] * 0.5 + c.fl * 5 - v[BF] * 0.6 - (partnerOf(s, t, ME) ? 25 : 0) + noise(); romantic = true; break;
-    case "askout": score = v[RO] + v[AT] * 0.3 - 18 - (partnerOf(s, t, ME) ? 30 : 0) + noise(); romantic = true; break;
-    case "kiss": score = v[RO] + v[AT] * 0.2 - 22 - (partnerOf(s, t, ME) ? 25 : 0) + noise(); romantic = true; break;
-    case "breakup": score = 70 - v[RO] * 0.6 + noise(); break;
-    case "gist": score = v[TR] * 0.8 + rel(s, t, x)[BF] * 0.3 + (receiptAbout(s, x) ? 15 : 0) + (a.claim === "likes" ? 10 : 0) + noise(); break;
-    case "setup": score = v[TR] * 0.75 + rel(s, t, x)[BF] * 0.4 - rel(s, t, x)[F] * 0.25 + 10 + noise(); break;
-    case "asksave": score = liking(s, t, ME) * 0.6 + 20 + (inSquad(s, t) ? 20 : 0) + noise(); break;
-    case "squad": score = liking(s, t, ME) * 0.6 + c.ly * 4 + noise(); break;
-    case "swear": score = v[TR] * 0.6 + c.ly * 5 + noise(); break;
-    case "bribe": score = 30 + (c.mo <= 2 ? 25 : -10) + c.bz * 4 + noise(); break;
-    case "receipt": score = v[TR] * 0.5 + 45 + noise(); break;
-    case "shade": score = 45 + noise() - v[F] * 0.2; break;
-    case "argue": score = me.fans / 10 + me.comp / 5 + 30 + noise() - (c.tp * 4); break;
-    case "accuse": score = isSab(s, t) ? (r.chance(0.6) ? 70 : 45) : (r.chance(0.12) ? 70 : 20); break;
-    case "apologize": score = v[F] * 0.4 + 50 - v[BF] * 0.5 + noise(); break;
-    case "peace": score = 45 + v[F] * 0.3 - v[BF] * 0.3 + c.mo * 4 + noise(); break;
-  }
-  if (cb && cb.tone) score += cb.tone > 0 ? 6 : act === "apologize" || act === "peace" ? -4 : -8;
-  const out = outcomeOf(score);
-  // A warm memory before a cold answer reads wrong; keep it for another time.
-  if (cb && ((cb.tone > 0 && out === "bad") || (cb.tone < 0 && out === "good" && act !== "apologize" && act !== "peace"))) { if (cb.ref) cb.ref.cb = false; }
-  else if (cb) lines.push({ w: t, t: cb.t, mood: cb.tone < 0 ? "angry" : cb.tone > 0 ? "happy" : "neutral", anim: cb.tone < 0 ? "wag" : cb.tone > 0 ? "happy" : "talk2" });
-  const said = fill(s, r, r.pick(replyBank(r, t, act, out)), t, { x, romantic: romantic && out === "good" });
-  lines.push({ w: t, t: said });
+function witnessesOf(s, sab, target) {
+  return living(s).filter((w) => w.id !== sab.id && w.id !== target.id && !isSab(w) && (sees(s, w, sab) || sees(s, w, target))).length;
+}
 
-  const plus = (idx, d, label) => { bump(s, t, ME, idx, d); if (label) fx.push(label); };
-  switch (act) {
-    case "chat": if (out === "good") { plus(F, 6, `${h.name} likes you more`); plus(TR, 3); } else if (out === "meh") plus(F, 2); else plus(F, -2, `${h.name} was not feeling it`); break;
-    case "joke":
-      if (out === "good") { plus(F, 8, `${h.name} is laughing`); h.comp = clamp(h.comp + 5); remember(s, t, { k: "laughed", x: ME }); me.fans = clamp(me.fans + 2); fx.push("Fans +2"); if (s.mission && s.mission.k === "laugh" && s.mission.who === t && !s.mission.done) { s.mission.n = (s.mission.n || 0) + 1; if (s.mission.n >= 2) completeMission(s, r); } for (const w of witnesses) bump(s, w.id, ME, F, 2); }
-      else if (out === "bad") plus(F, -3, "That joke flopped");
-      break;
-    case "compliment": if (out === "good") { plus(F, 5, `${h.name} is flattered`); plus(RO, v[AT] / 10); } else if (out === "bad") plus(TR, -3, `${h.name} thinks you want something`); break;
-    case "deep":
-      if (out === "good") {
-        plus(TR, 8, "They opened up to you"); plus(F, 6); me.comp = clamp(me.comp + 8); remember(s, t, { k: "deep", x: ME });
-        if (!s.gb.some((g) => g.k === "secret" && g.about.includes(t))) addGist(s, "secret", `${h.name}'s secret: "${SECRETS[t]}"`, "secret:" + t, [t]);
-      } else if (out === "meh") plus(F, 3); else plus(TR, -2, `${h.name} shut you out`);
-      break;
-    case "hug": if (out === "good") { plus(F, 5, "Warm hug"); h.comp = clamp(h.comp + 5); me.comp = clamp(me.comp + 3); } else if (out === "bad") plus(F, -4, `${h.name} didn't want that`); break;
-    case "gift": if (out !== "bad") remember(s, t, { k: "gift", x: ME }); if (out === "good") { plus(F, 10, `${h.name} loved the gift`); plus(TR, 4); } else if (out === "meh") plus(F, 4); else plus(F, -2); if (s.mission && s.mission.k === "gift" && s.mission.who === t && !s.mission.done) completeMission(s, r); break;
-    case "flirt":
-      if (out === "good") { plus(RO, 6 + v[AT] / 10, `${h.name} is blushing`); me.fans = clamp(me.fans + 2); if (rel(s, t, ME)[RO] >= 55 && rel(s, ME, t)) makeShip(s, r, ME, t, false); }
-      else if (out === "meh") plus(RO, 2); else { plus(F, -3, `${h.name} curved you`); me.comp = clamp(me.comp - 4); remember(s, t, { k: "curved", x: ME }); }
-      jealousy(s, r, t, witnesses, 8);
-      break;
-    case "askout":
-      if (out === "good") {
-        const sh = makeShip(s, r, ME, t, true); plus(RO, 10, `You and ${h.name} are official! #${sh.name}`); me.fans = clamp(me.fans + 8); h.fans = clamp(h.fans + 5);
-        tweet(s, r, "ship", ME, t, sh.name); jealousy(s, r, t, inHouse(s).filter((q) => !q.human), 12);
-      } else if (out === "meh") plus(RO, 2); else { plus(RO, -8, "Rejected. On camera."); plus(F, -4); me.comp = clamp(me.comp - 8); me.fans = clamp(me.fans + 2); remember(s, t, { k: "curved", x: ME }); }
-      break;
-    case "kiss":
-      if (out === "good") {
-        const sh = makeShip(s, r, ME, t, true); plus(RO, 12, "The kiss of the season!"); me.fans = clamp(me.fans + 10); h.fans = clamp(h.fans + 6);
-        tweet(s, r, "kiss", ME, t, sh.name); logEv(s, `${me.name} and ${h.name} kissed in the ${ROOMS[me.room].name}.`, "kiss");
-        jealousy(s, r, t, inHouse(s).filter((q) => !q.human), 16);
-        for (const w of witnesses) remember(s, w.id, { k: "kiss", x: ME, y: t, room: ROOMS[me.room].name.toLowerCase() });
-        if (s.mission && s.mission.k === "kiss" && !s.mission.done) completeMission(s, r);
-      } else if (out === "meh") plus(RO, 1, "Not here, not now");
-      else { plus(F, -10, `${h.name} is not happy`); plus(TR, -10); plus(BF, 10); me.comp = clamp(me.comp - 10); me.fans = clamp(me.fans + 4); }
-      break;
-    case "breakup":
-      breakShip(s, ME, t);
-      if (out === "bad") { plus(BF, 25, `${h.name} is heartbroken and furious`); h.comp = clamp(h.comp - 20); me.fans = clamp(me.fans + 6); logEv(s, `${me.name} broke up with ${h.name}. Loudly.`, "fight"); }
-      else { plus(RO, -20, "You're just friends now"); }
-      break;
-    case "gist": {
-      const truth = claimTrue(s, a.claim, x, t);
-      const k = out === "good" ? 1 : out === "meh" ? 0.5 : 0;
-      if (k > 0) {
-        if (a.claim === "likes") { bump(s, t, x, RO, 10 * k); bump(s, t, x, F, 5 * k); }
-        if (a.claim === "hates") { bump(s, t, x, BF, 15 * k); bump(s, t, x, F, -8 * k); }
-        if (a.claim === "fake") { bump(s, t, x, TR, -12 * k); bump(s, t, x, SU, 5 * k); }
-        if (a.claim === "sab") bump(s, t, x, SU, 22 * k);
-        if (a.claim === "using") { bump(s, t, x, TR, -15 * k); bump(s, t, x, RO, -10 * k); }
-        plus(TR, 4 * k);
-        fx.push(`${h.name} ${k === 1 ? "believes" : "half-believes"} you about ${nameOf(s, x)}`);
-        remember(s, t, { k: "told", x, src: ME, c: a.claim });
-      } else {
-        plus(TR, -6, `${h.name} doesn't believe you`);
-        if (r.chance(0.4)) { bump(s, x, ME, BF, 10); fx.push(`${h.name} might tell ${nameOf(s, x)}...`); }
+function sabThink(s, p) {
+  const b = p.b;
+  // A body you made: sometimes walk off, sometimes cry wolf.
+  if (s.now >= p.cd && !b.doing) {
+    const targets = living(s).filter((q) => !isSab(q) && Math.hypot(q.x - p.x, q.z - p.z) < 11);
+    let best = null;
+    for (const q of targets) if (witnessesOf(s, p, q) === 0 && (!best || dist(p, q) < dist(p, best))) best = q;
+    if (best) {
+      if (dist(p, best) <= RANGE.strike) {
+        if (R.chance(s, 0.55)) {
+          strike(s, p, best);
+          b.hunt = null;
+          if (s.phase !== "PLAY") return;
+          if (R.chance(s, 0.18)) { b.reportBody = best.id; b.reportAt = s.now + R.range(s, 1500, 3500); }
+          else { const far = R.pick(s, TASK_IDS); setGoal(s, p, [STATIONS[far].x, STATIONS[far].z], "flee"); }
+          return;
+        }
+      } else if (!b.hunt || b.hunt !== best.id || s.now >= b.rethink) {
+        b.hunt = best.id; b.rethink = s.now + 900;
+        setGoal(s, p, [best.x, best.z], "hunt");
       }
-      if (!truth) { s.lies.push({ to: t, about: x, c: a.claim, d: s.day, exposed: false }); fx.push("That was a lie. Lies get exposed."); }
-      break;
-    }
-    case "setup": {
-      const truth = claimTrue(s, "hates", x, t);
-      if (out === "good") {
-        bump(s, t, x, BF, 22); bump(s, t, x, F, -12); plus(TR, 5, `${h.name} is furious at ${nameOf(s, x)}`);
-        const X = hmOf(s, x);
-        if (X.room === h.room && !X.sc && !h.sc && X.act !== "sleep") { startScene(s, r, "argue", t, x, h.room); fx.push("A fight is starting!"); }
-        else remember(s, t, { k: "grudge", x, src: ME });
-      } else if (out === "meh") { bump(s, t, x, BF, 8); fx.push(`${h.name} will ask ${nameOf(s, x)} directly`); }
-      else { plus(TR, -10, `${h.name} sees what you're doing`); bump(s, x, ME, BF, 12); }
-      if (!truth) { s.lies.push({ to: t, about: x, c: "hates", d: s.day, exposed: false }); fx.push("That was a lie. Lies get exposed."); }
-      break;
-    }
-    case "asksave":
-      if (out === "good") { s.prom[t + ">" + ME] = "save"; plus(F, 2, `${h.name} promised to save you`); }
-      else if (out === "bad") plus(F, -2, `${h.name} won't promise`); else fx.push("No promise yet");
-      break;
-    case "squad":
-      if (out === "good") {
-        let q = s.squads.find((z) => z.members.includes(ME));
-        if (!q) { q = { name: squadName(s, r), members: [ME] }; s.squads.push(q); }
-        if (q.members.length < 5) q.members.push(t);
-        plus(TR, 10, `${h.name} joined your squad: ${q.name}`); s.prom[t + ">" + ME] = "save";
-      } else if (out === "bad") plus(TR, -4, `${h.name} said no`);
-      break;
-    case "swear": if (out === "good") plus(TR, 8, `${h.name} trusts you more`); else if (out === "bad") plus(TR, -2); break;
-    case "bribe":
-      if (out === "good") { s.prom[t + ">" + ME] = "save"; plus(F, 3, `${h.name} took the money. Save secured?`); }
-      else if (out === "meh") fx.push("They took it. No promises.");
-      else { plus(TR, -10, `${h.name} is disgusted`); if (c.mo >= 4) strike(s, r, ME, "attempting to bribe a housemate"); }
-      break;
-    case "receipt": {
-      const g = receiptAbout(s, x);
-      if (out !== "bad") {
-        const k = out === "good" ? 1 : 0.5;
-        if (/sab:|skim:|scheme/.test(g.tag)) bump(s, t, x, SU, 26 * k);
-        else bump(s, t, x, BF, 12 * k);
-        bump(s, t, x, TR, -10 * k); plus(F, 3, `${h.name} now sees ${nameOf(s, x)} differently`);
-      } else plus(TR, -3, `${h.name} brushed it off`);
-      break;
-    }
-    case "shade":
-      if (out === "good") { me.fans = clamp(me.fans + 4); plus(BF, 8, "Savage. The house is screaming."); h.comp = clamp(h.comp - 6); for (const w of witnesses) if (rel(s, w.id, t)[BF] > 20) bump(s, w.id, ME, F, 3); }
-      else { plus(BF, 10, `${h.name} is ready for war`); me.fans = clamp(me.fans + 1); }
-      addBeef(s, ME, t); remember(s, t, { k: "shaded", x: ME });
-      break;
-    case "argue":
-      remember(s, t, { k: "fight", x: ME, y: t });
-      for (const w of witnesses) remember(s, w.id, { k: "fight", x: ME, y: t, room: ROOMS[me.room].name.toLowerCase() });
-      plus(BF, 12); plus(F, -8); h.comp = clamp(h.comp - 10); me.comp = clamp(me.comp - 10); me.fans = clamp(me.fans + 5);
-      fx.push("Drama! Fans +5"); addBeef(s, ME, t); logEv(s, `${me.name} and ${h.name} had a heated argument.`, "fight"); tweet(s, r, "fight", ME, t);
-      if (out === "good") { h.comp = clamp(h.comp - 8); fx.push(`${h.name} backed down`); }
-      if (r.chance(me.comp < 35 ? 0.3 : 0.12)) strike(s, r, ME, "threatening another housemate");
-      if (c.tp >= 4 && r.chance(0.25)) strike(s, r, t, "shouting at another housemate");
-      break;
-    case "accuse": {
-      plus(BF, 20, `${h.name} will not forget this`); me.fans = clamp(me.fans + 4);
-      const cred = v[TR];
-      for (const w of witnesses) bump(s, w.id, t, SU, 6 + rel(s, w.id, ME)[TR] / 8 + (receiptAbout(s, t) ? 10 : 0));
-      if (isSab(s, t)) s.hm[0].sus += 4; else h.fans = clamp(h.fans + 3);
-      if (out === "good") fx.push(`${h.name} looked rattled...`);
-      logEv(s, `${me.name} accused ${h.name} of being a Saboteur.`, "accuse");
-      tweet(s, r, "sus", t);
-      void cred;
-      break;
-    }
-    case "apologize": if (out === "good") { plus(BF, -20, "Apology accepted"); plus(F, 5); } else if (out === "meh") plus(BF, -8, "They're thinking about it"); else fx.push("Not accepted"); break;
-    case "peace":
-      if (out === "good") { plus(BF, -35, "Peace made"); plus(TR, 6); bump(s, ME, t, BF, -35); s.beefs = s.beefs.filter((b) => !(b.includes(ME) && b.includes(t))); }
-      else if (out === "bad") plus(BF, 3, "No peace today"); else plus(BF, -10, "A truce, for now");
-      break;
+    } else if (b.hunt) { b.hunt = null; b.path = []; }
+    // Nobody alone? Cut the light and try again in the dark.
+    if (!best && !s.sab && s.now >= s.sabAt && R.chance(s, 0.03)) sabotage(s, p, "nepa");
   }
-  if (["argue", "accuse", "shade", "kiss"].includes(act) && witnesses.length) fx.push(`${witnesses.length} housemate${witnesses.length > 1 ? "s" : ""} saw that`);
-  s.last = { n: s.nid + 1, who: t, act, out, lines, fx };
-  s.nid += 1;
-}
-
-function receiptText(s, x) {
-  const g = receiptAbout(s, x);
-  if (!g) return "";
-  if (/skim:/.test(g.tag)) return "took money from the till";
-  if (/sab:/.test(g.tag)) return "was whispering with the other Saboteur";
-  if (/kiss:/.test(g.tag)) return "was kissing somebody behind your back";
-  if (/hates:/.test(g.tag)) return "was talking bad about people";
-  if (/deal:/.test(g.tag)) return "has a secret deal";
-  return "was doing something shady";
-}
-
-function partnerOf(s, id, except) {
-  for (const sh of s.ships) {
-    if (!sh.official) continue;
-    if (sh.a === id && sh.b !== except) return sh.b;
-    if (sh.b === id && sh.a !== except) return sh.a;
+  if (!s.sab && s.now >= s.sabAt && R.chance(s, 0.006)) {
+    const k = R.chance(s, 0.3) && s.now - (s.playAt || 0) > 50000 && living(s).filter((q) => !isSab(q)).length >= 3 ? "gas" : "nepa";
+    sabotage(s, p, k);
   }
-  return null;
 }
 
-function inSquad(s, id) { return s.squads.some((q) => q.members.includes(ME) && q.members.includes(id)); }
-
-function squadName(s, r) {
-  const names = ["The Owambe Mafia", "Jollof Cartel", "Team No Wahala", "The Lekki Seven", "Gist Gang", "Suya Squad", "Danfo Crew"];
-  const used = new Set(s.squads.map((q) => q.name));
-  return r.pick(names.filter((n) => !used.has(n))) || "The Squad";
-}
-
-/** Anyone crushing on t who saw that gets jealous of the player. */
-function jealousy(s, r, t, pool, amt) {
-  for (const w of pool) {
-    if (w.id === t || w.human) continue;
-    if (rel(s, w.id, t)[RO] >= 40) { bump(s, w.id, ME, BF, amt); if (BY[w.id].jl >= 4) w.comp = clamp(w.comp - 6); }
+/** Send the nearest housemate bots to fix a sabotage. */
+function assignFixers(s) {
+  if (!s.sab || s.sab.assigned) return;
+  const pool = living(s).filter((p) => p.ctl === "b" && !isSab(p));
+  const stations = s.sab.k === "nepa" ? ["gen"] : ["gas1", "gas2"];
+  const used = new Set();
+  s.sab.assigned = {};
+  for (const id of stations) {
+    const st = STATIONS[id];
+    const order = pool.filter((p) => !used.has(p.id)).sort((a, c) => Math.hypot(a.x - st.x, a.z - st.z) - Math.hypot(c.x - st.x, c.z - st.z));
+    for (const p of order.slice(0, s.sab.k === "nepa" ? 2 : 1)) { used.add(p.id); s.sab.assigned[p.id] = id; setGoal(s, p, [st.x, st.z], "fix:" + id); }
   }
-  const p = partnerOf(s, t, ME);
-  if (p && p !== ME) { bump(s, p, ME, BF, amt + 6); bump(s, p, t, TR, -8); }
 }
 
-// ---------------------------------------------------------------------------
-// Eavesdropping
-// ---------------------------------------------------------------------------
-
-function listen(s, r, id) {
-  const sc = s.scenes.find((z) => z.id === id);
-  const me = s.hm[0];
-  sc.heard = true;
-  s.heard = sc.lines.map((l) => ({ w: l.w, t: l.t }));
-  s.heardId = sc.id;
-  const A = nameOf(s, sc.a), B = nameOf(s, sc.b), X = sc.x ? nameOf(s, sc.x) : "";
-  const tag = {
-    flirt: `flirt:${sc.a}+${sc.b}`, kiss: `kiss:${sc.a}+${sc.b}`, argue: `beef:${sc.a}+${sc.b}`,
-    gossip: `hates:${sc.a}>${sc.x} hates:${sc.b}>${sc.x}`, deal: `deal:${sc.a}+${sc.b}`,
-    scheme: `sab:${sc.a} sab:${sc.b}`, bond: `bond:${sc.a}+${sc.b}`, cry: `cry:${sc.a}`,
-  }[sc.k];
-  const text = {
-    flirt: `You caught ${A} and ${B} flirting in the ${ROOMS[sc.room].name}.`,
-    kiss: `You saw ${A} and ${B} kiss.`,
-    argue: `You heard ${A} and ${B} fighting.`,
-    gossip: `You heard ${A} and ${B} talking bad about ${X}.`,
-    deal: `You overheard ${A} and ${B} making a secret save deal.`,
-    scheme: `You heard ${A} and ${B} talking about The Whisper. They're the Saboteurs!`,
-    bond: `${A} and ${B} are close. Really close.`,
-    cry: `${A} was crying to ${B}.`,
-  }[sc.k];
-  const about = [sc.a, sc.b].concat(sc.x ? [sc.x] : []);
-  addGist(s, sc.k === "bond" || sc.k === "cry" ? "gist" : "receipt", text, tag, about);
-  if (sc.x === ME) note(s, `They were talking about YOU.`, "bad");
-  // Getting caught.
-  if (PRIVATE[sc.k]) {
-    const p = Math.max(BY[sc.a].ob, BY[sc.b].ob) * 0.06;
-    if (r.chance(p)) {
-      bump(s, sc.a, ME, TR, -10); bump(s, sc.b, ME, TR, -10);
-      note(s, `${A} caught you eavesdropping!`, "bad");
-      if (sc.k === "scheme") { me.sus += 10; }
-    }
+function botPerceive(s, p) {
+  const b = p.b;
+  const room = roomAt(p.x, p.z);
+  if (!b.rooms.length || b.rooms[b.rooms.length - 1].room !== room) { b.rooms.push({ room, at: s.now }); if (b.rooms.length > 6) b.rooms.shift(); }
+  for (const q of living(s)) if (q.id !== p.id && sees(s, p, q)) b.seen[q.id] = { room: roomAt(q.x, q.z), at: s.now };
+  if (b.reportBody) return;
+  for (const body of s.bodies) {
+    if (!seesPoint(s, p, body.x, body.z)) continue;
+    if (isSab(p)) continue; // Saboteurs walk past bodies they did not plan to report.
+    b.reportBody = body.id; b.reportAt = s.now + R.range(s, 500, 1600);
+    break;
   }
-  if (sc.k === "scheme") { logEv(s, `${me.name} overheard something they shouldn't have.`, "sab"); me.fans = clamp(me.fans + 3); }
-  me.acts += 1;
 }
 
-function completeMission(s, r) {
-  if (!s.mission || s.mission.done) return;
-  s.mission.done = true;
-  s.hm[0].coins += 300;
-  note(s, `${EYE}: Secret mission complete. 300 House Coins are yours.`, "good");
-  void r;
-}
-
-function buy(s, r, item) {
-  const me = s.hm[0];
-  if (item === "peek") {
-    me.coins -= 150;
-    s.peeks += 1;
-    // Reveal a real Diary Room line from someone.
-    const pool = aiIn(s).map((h) => h.id);
-    const who = r.pick(pool);
-    let text;
-    if (s.saves && s.saves[who]) text = `${nameOf(s, who)} (Diary Room): "I saved ${s.saves[who].map((i) => nameOf(s, i)).join(" and ")}."`;
-    else {
-      const snake = pool.filter((i) => i !== who).sort((p, q) => liking(s, who, p) - liking(s, who, q))[0] || ME;
-      const fav = [ME].concat(pool).filter((i) => i !== who).sort((p, q) => liking(s, who, q) - liking(s, who, p))[0];
-      text = `${nameOf(s, who)} (Diary Room): "The biggest snake here is ${nameOf(s, snake)}. My favourite? ${nameOf(s, fav)}."`;
-      addGist(s, "receipt", text, `hates:${who}>${snake}`, [who, snake]);
-      note(s, "Sneak Peek added to your Gist Book.", "good");
+function botPlay(s, p, dt) {
+  const b = p.b;
+  if (p.alive) botPerceive(s, p);
+  // Report a body once you reach it.
+  if (b.reportBody && p.alive && s.now >= b.reportAt) {
+    const body = s.bodies.find((x) => x.id === b.reportBody);
+    if (!body) b.reportBody = null;
+    else if (Math.hypot(body.x - p.x, body.z - p.z) <= RANGE.report) {
+      for (const q of living(s)) if (q.id !== p.id && sees(s, p, q) && Math.hypot(q.x - body.x, q.z - body.z) < 6) b.sus[q.id] = (b.sus[q.id] || 0) + 12;
+      startMeeting(s, p.id, "body", body.id);
       return;
     }
-    addGist(s, "receipt", text, `saves:${who}`, [who]);
-    note(s, "Sneak Peek added to your Gist Book.", "good");
-  } else if (item === "immunity") {
-    me.coins -= 800;
-    me.immune = true;
-    note(s, "Immunity Token bought. You cannot be nominated this week.", "good");
-    logEv(s, `${me.name} bought the Immunity Token.`, "power");
+    else if (b.gk !== "body") setGoal(s, p, [body.x, body.z], "body");
   }
-}
-/** Named continuations and choice handlers (state stores names, never functions). */
-const FN_REG = {};
-
-// ---------------------------------------------------------------------------
-// Show events. An event is a queue of items the client steps through:
-//   { b: beat }     a line of dialogue (next)
-//   { c: choice }   the player picks (pick)
-//   { m: mini }     a mini-game (score)
-//   { f, a }        server continuation, runs automatically
-// ---------------------------------------------------------------------------
-
-function openEvent(s, k, stage, title) {
-  s.phase = "EV";
-  s.evn = (s.evn || 0) + 1;
-  s.ev = { k, n: s.evn, stage, title: title || "", q: [], i: 0, data: {} };
-  s.done[s.day + ":" + k] = true;
-  return s.ev;
-}
-function beat(s, w, t, extra) { s.ev.q.push({ b: Object.assign({ w, t }, extra || {}) }); }
-function choice(s, spec) { s.ev.q.push({ c: spec }); }
-function mini(s, spec) { s.ev.q.push({ m: spec }); }
-function cont(s, f, a) { s.ev.q.push({ f, a: a === undefined ? null : a }); }
-
-function playerIn(s) { return !s.hm[0].out; }
-
-function evRun(s, r) {
-  while (s.ev && s.ev.i < s.ev.q.length) {
-    const it = s.ev.q[s.ev.i];
-    if (it.f) { s.ev.i += 1; FN[it.f](s, r, it.a); continue; }
-    // Choices and mini-games are skipped when the player has left the house.
-    if ((it.c || it.m) && !playerIn(s) && !(it.c && it.c.spectator)) { s.ev.i += 1; if (it.c && it.c.auto) FN[it.c.auto](s, r, null); continue; }
+  if (p.alive && isSab(p)) { sabThink(s, p); if (s.phase !== "PLAY") return; }
+  if (s.sab && s.sab.assigned && s.sab.assigned[p.id] && !(b.gk || "").startsWith("fix:")) {
+    const id = s.sab.assigned[p.id];
+    setGoal(s, p, [STATIONS[id].x, STATIONS[id].z], "fix:" + id);
+  }
+  // Doing something at a station.
+  if (b.doing) {
+    if (s.now < b.until) { p.mv = 0; return; }
+    const id = b.doing; b.doing = null;
+    if (STATIONS[id].kind === "task" && myTask(p, id) && !myTask(p, id).done && nearStation(p, id)) finishStation(s, p, id);
+    else if (STATIONS[id].kind === "fix" && !stationOpen(s, p, id) && nearStation(p, id)) finishStation(s, p, id);
+    if (s.phase !== "PLAY") return;
+    b.gk = null; b.idleUntil = s.now + R.range(s, 1500, 5000);
     return;
   }
-  if (s.ev) endEvent(s, r);
+  if (!b.path.length && s.now < b.idleUntil) { p.mv = 0; return; }
+  const arrived = stepAlong(s, p, dt);
+  if (!arrived) return;
+  const gk = b.gk || "";
+  if (gk.startsWith("task:") || gk.startsWith("fix:")) {
+    const id = gk.split(":")[1];
+    const st = STATIONS[id];
+    if (st.kind === "fix" && stationOpen(s, p, id)) { b.gk = null; return; }
+    p.f = st.f;
+    b.doing = id; b.until = s.now + st.dur * 1000 * R.range(s, 1.05, 1.5);
+    p.mv = 0;
+    return;
+  }
+  if (gk === "hunt" || gk === "body") { b.gk = null; return; }
+  b.gk = null;
+  b.idleUntil = s.now + R.range(s, 400, 2500);
+  nextChore(s, p);
 }
 
-function endEvent(s, r) {
-  s.ev = null;
-  if (s.result) { s.phase = "END"; return; }
-  s.phase = "ROAM";
-  void r;
-}
-
-function housemateOptions(s, filter) {
-  return inHouse(s).filter((h) => !h.human && (!filter || filter(h))).map((h) => ({ v: h.id, l: h.name }));
+/** Drive every AI-controlled body for one tick of `dt` seconds. */
+function tickBots(s, dt) {
+  if (s.phase !== "PLAY") return;
+  assignFixers(s);
+  for (const p of s.ps) {
+    if (p.ctl !== "b" || p.spec) continue;
+    if (!p.b) p.b = brainNew();
+    if (!p.alive && isSab(p)) { if (!p.b.path.length && R.chance(s, 0.02)) nextChore(s, p); else stepAlong(s, p, dt); continue; }
+    botPlay(s, p, dt);
+    if (s.phase !== "PLAY") return;
+  }
 }
 
 // ---------------------------------------------------------------------------
-// Entry night
+// Meetings: what bots say and how they vote.
 // ---------------------------------------------------------------------------
 
-const DAPO_QUIPS = [
-  "Nigeria, hold your chest!", "Somebody call the fire service!", "The drip is dripping!", "Ladies and gentlemen, the energy!",
-  "Oya, give it up!", "That entrance? Premium!", "Wahala don start!", "I'm already scared!", "The house will never be the same.", "Welcome, welcome!",
-];
+const ROOMS_SAID = (r) => ROOM_NAME[r] || "house";
 
-function startEntry(s, r) {
-  openEvent(s, "entry", "arena", "ENTRY NIGHT");
-  beat(s, "dapo", "Good evening, Nigeria! Welcome to the premiere of WAHALA HOUSE!", { anim: "cheer" });
-  beat(s, "dapo", "Eleven housemates. One mansion in Lekki. Cameras in every corner. And somewhere among them... two Saboteurs.");
-  const order = r.shuffle(AI_IDS);
-  // The entrances play as a montage: each one advances on its own.
-  order.forEach((id, i) => {
-    const c = BY[id];
-    beat(s, id, c.sig, { enter: id, anim: "strut", sub: `${c.full}, ${c.age}. ${c.job} from ${c.from}.`, auto: 2400 });
-    if (i % 3 === 2) beat(s, "dapo", DAPO_QUIPS[i % DAPO_QUIPS.length], { auto: 1400 });
-  });
-  beat(s, "dapo", `And our final housemate... ${s.hm[0].name}!`, { enter: ME, anim: "strut" });
-  choice(s, {
-    k: "plan", p: `${DAPO}: ${s.hm[0].name}, how do you plan to win Wahala House?`, n: 1, h: "entryPlan",
-    o: [
-      { v: "vibes", l: "Pure vibes. Good energy only.", sub: "Everyone warms to you" },
-      { v: "strategy", l: "Strategy. Every move counts.", sub: "Respect, and a little suspicion" },
-      { v: "love", l: "Love. I came to find my person.", sub: "The flirts take notice" },
-      { v: "chaos", l: "Chaos. I'm here for the wahala.", sub: "Fans love it. Housemates, less" },
-    ],
-  });
-  beat(s, "eye", "Housemates, this is Mama Eye. Welcome to your home.", { stage: "lounge" });
-  beat(s, "eye", "Every room has eyes. Every whisper has ears. And every lie... has consequences.");
-  cont(s, "roleReveal");
-}
+function say(s, p, at, text, about, k) { p.b.plan.push({ at, text, about: about || null, k: k || null }); }
 
-function entryPlan(s, r, v) {
-  const me = s.hm[0];
-  for (const h of aiIn(s)) {
-    const c = BY[h.id];
-    if (v === "vibes") bump(s, h.id, ME, F, 5);
-    if (v === "strategy") { if (c.sc >= 4) bump(s, h.id, ME, TR, 5); bump(s, h.id, ME, SU, 3); }
-    if (v === "love" && rel(s, h.id, ME)[AT] >= 40) bump(s, h.id, ME, RO, 7);
-    if (v === "chaos") bump(s, h.id, ME, BF, 3);
-  }
-  if (v === "strategy") me.fans = clamp(me.fans + 3);
-  if (v === "love") me.fans = clamp(me.fans + 4);
-  if (v === "chaos") me.fans = clamp(me.fans + 8);
-  s.plan0 = v;
-  void r;
-}
-
-FN_REG.roleReveal = (s, r) => {
-  const me = s.hm[0];
-  if (me.role === "S") {
-    const partner = s.sabs.find((x) => x !== ME);
-    beat(s, "whisper", `${me.name}. Don't turn around. This is The Whisper.`, { stage: "redroom" });
-    beat(s, "whisper", `You are a Saboteur. Your partner is ${nameOf(s, partner)}. Nobody else knows.`, { reveal: partner });
-    beat(s, "whisper", "Drain the prize pot. Frame the loud ones. And on Friday at midnight, we strike one of them out.");
-    beat(s, "whisper", "If they call you out at the Showdown and the house agrees... it's over. Smile. Blend in.");
-  } else {
-    beat(s, "eye", "Housemates, a warning. Two of you are Saboteurs, working for The Whisper.");
-    beat(s, "eye", "They will rig tasks, plant lies and, on Friday night, strike one housemate out of this house.");
-    beat(s, "eye", "Find them. Or become their next victim.");
-  }
-  cont(s, "entryEnd");
-};
-
-FN_REG.entryEnd = (s, r) => {
-  s.min = 1260;
-  for (const h of aiIn(s)) h.room = "lounge";
-  placeAI(s, r);
-  s.hm[0].room = "lounge";
-  note(s, "Day 0. Get to know the house. Nobody is safe on Wednesday.", "info");
-};
-
-// ---------------------------------------------------------------------------
-// Nightly Red Room (Saboteurs)
-// ---------------------------------------------------------------------------
-
-function nightEvent(s, r) {
-  s.done[s.day + ":night"] = true;
-  const me = s.hm[0];
-  if (me.role === "S" && !me.out) {
-    openEvent(s, "night", "redroom", "THE RED ROOM");
-    emptyBeds(s, r);
-    beat(s, "whisper", "Welcome to the Red Room.");
-    const partner = s.sabs.find((x) => x !== ME);
-    const ph = hmOf(s, partner);
-    if (ph && !ph.out) beat(s, partner, redroomLine(s, r, partner));
-    choice(s, {
-      k: "red", p: `${WHISPER}: What is tonight's move?`, n: 1, h: "redPlan",
-      o: [
-        { v: "skim", l: "SKIM THE TASK", sub: "Steal more from the next wager task" },
-        { v: "plant", l: "PLANT A RECEIPT", sub: "Make the house suspect someone" },
-        { v: "rumor", l: "SPREAD A RUMOR", sub: "Quietly damage someone's trust" },
-        { v: "rest", l: "LAY LOW", sub: "Do nothing tonight" },
-      ],
-    });
-    return true;
-  }
-  sabNight(s, r);
-  return false;
-}
-
-function redroomLine(s, r, partner) {
-  const top = topThreat(s);
-  const lines = [
-    top ? `${nameOf(s, top)} is asking too many questions. We need to deal with that.` : "Nobody suspects anything. Yet.",
-    "Keep your face normal tomorrow. They're watching.",
-    top ? `If we frame ${nameOf(s, top)}, the whole house turns on them.` : "Let's drain the pot small small.",
-  ];
-  void partner;
-  return r.pick(lines);
-}
-
-function topThreat(s) {
-  let best = null, bv = -1;
-  for (const h of inHouse(s)) {
-    if (isSab(s, h.id)) continue;
-    const t = threatOf(s, h.id);
-    if (t > bv) { bv = t; best = h.id; }
-  }
-  return best;
-}
-
-FN_REG.redPlan = (s, r, v) => {
-  if (v === "skim") { s.plan.skim += 2; beat(s, "whisper", "Good. When the money moves on Thursday, some of it moves to us."); }
-  else if (v === "rest") beat(s, "whisper", "Patience is also a weapon.");
-  else {
-    choice(s, { k: "redTarget", p: v === "plant" ? `${WHISPER}: Who do we frame?` : `${WHISPER}: Who do we whisper about?`, n: 1, h: "redTarget", ctx: v,
-      o: housemateOptions(s, (h) => !isSab(s, h.id)) });
-  }
-};
-
-FN_REG.redTarget = (s, r, v, ctx) => {
-  if (ctx === "plant") { plant(s, r, v); beat(s, "whisper", `It's done. By morning, someone will "find" something on ${nameOf(s, v)}.`); }
-  else { rumor(s, r, v); beat(s, "whisper", `The whispers about ${nameOf(s, v)} have started.`); }
-};
-
-function plant(s, r, x) {
-  const pool = r.shuffle(aiIn(s).filter((h) => !isSab(s, h.id) && h.id !== x));
-  for (const w of pool.slice(0, 2)) { bump(s, w.id, x, SU, 18 + r.int(10)); remember(s, w.id, { k: "planted", x }); }
-  if (x === ME) s.hm[0].sus += 3;
-}
-function rumor(s, r, x) {
-  const pool = r.shuffle(aiIn(s).filter((h) => h.id !== x));
-  for (const w of pool.slice(0, 4)) { bump(s, w.id, x, TR, -6); bump(s, w.id, x, SU, 8); }
-}
-
-/** Light sleepers notice empty beds while the Saboteurs meet. */
-function emptyBeds(s, r) {
-  for (const sab of s.sabs) {
-    const sh = hmOf(s, sab);
-    if (!sh || sh.out) continue;
-    for (const w of aiIn(s)) {
-      if (isSab(s, w.id) || BY[w.id].ob < 4) continue;
-      if (r.chance(0.09)) { bump(s, w.id, sab, SU, 10); remember(s, w.id, { k: "empty_bed", x: sab }); if (sab === ME) s.hm[0].sus += 2; }
+function botsPlanMeeting(s) {
+  const m = s.meet;
+  const victim = m.body ? pOf(s, m.body) : null;
+  const where = ROOMS_SAID(m.room);
+  for (const p of living(s)) {
+    if (p.ctl !== "b") continue;
+    const b = p.b || (p.b = brainNew());
+    b.plan = []; b.path = []; b.doing = null; b.hunt = null; b.reportBody = null; b.voteAt = 0;
+    let t = s.now + R.range(s, 1500, 4000);
+    const ex = exOf(p, s);
+    if (m.by === p.id) {
+      if (m.kind === "body") say(s, p, s.now + R.range(s, 900, 2000), `${ex} Body for the ${where}! Na ${victim ? victim.name : "somebody"}.`);
+      else say(s, p, s.now + R.range(s, 900, 2000), "I ring the bell because something no dey add up.");
+      t += 2500;
     }
-  }
-}
-
-/** AI Saboteurs act at night when the player is not one of them. */
-function sabNight(s, r) {
-  emptyBeds(s, r);
-  const alive = s.sabs.filter((x) => x !== ME && !hmOf(s, x).out);
-  if (!alive.length) return;
-  const top = topThreat(s);
-  const tv = top ? threatOf(s, top) : 0;
-  if (s.day >= 1 && s.day <= 3 && r.chance(0.5)) s.plan.skim += 1;
-  else if (top && tv > 35 && r.chance(0.6)) plant(s, r, top);
-  else if (top && r.chance(0.5)) rumor(s, r, top);
-}
-
-// ---------------------------------------------------------------------------
-// Monday: Head of House game (JOLLOF RUSH)
-// ---------------------------------------------------------------------------
-
-function startHoh(s, r) {
-  openEvent(s, "hoh", "kitchen", "HEAD OF HOUSE: JOLLOF RUSH");
-  gatherAll(s, "kitchen");
-  beat(s, "eye", "Housemates, please gather in the kitchen. It is time for the Head of House game.");
-  beat(s, "eye", "JOLLOF RUSH. Ninety seconds. Orders will come in fast. Cook, plate and serve before anything burns.");
-  beat(s, "eye", "The highest score becomes Head of House: immune from nomination, the HoH Lounge, a Tenant of your choice, and the Veto.");
-  mini(s, { g: "jollof", h: "hohScore", secs: 90, hard: s.hm[0].comp < 30 });
-  cont(s, "hohResult");
-}
-
-function aiJollof(s, r, h) { return 1100 + BY[h.id].ck * 300 + r.int(1000) - (h.comp < 40 ? 250 : 0); }
-
-FN_REG.hohScore = (s, r, v) => { s.ev.data.my = v; };
-FN_REG.hohResult = (s, r) => {
-  const board = inHouse(s).map((h) => ({ id: h.id, sc: h.human ? (s.ev.data.my || 0) : aiJollof(s, r, h) }));
-  board.sort((a, b) => b.sc - a.sc);
-  s.ev.data.board = board;
-  const win = board[0].id;
-  s.hoh = win;
-  const wh = hmOf(s, win);
-  wh.fans = clamp(wh.fans + 6);
-  wh.coins += 300;
-  beat(s, "eye", "The pots are down. Here are your scores.", { board: board.slice(0, 11) });
-  beat(s, "eye", `${nameOf(s, win)}, you are the new Head of House!`, { focus: win, anim: "cheer" });
-  logEv(s, `${nameOf(s, win)} won Head of House with ${board[0].sc} points.`, "power");
-  tweet(s, r, "hoh", win);
-  if (win === ME) {
-    choice(s, { k: "tenant", p: `${EYE}: Head of House, choose a Tenant to share the HoH Lounge with you.`, n: 1, h: "pickTenant", o: housemateOptions(s) });
-  } else {
-    const t = inHouseIds(s).filter((x) => x !== win).sort((a, b) => liking(s, win, b) - liking(s, win, a))[0];
-    FN_REG.pickTenant(s, r, t);
-    beat(s, win, t === ME ? `I choose ${nameOf(s, t)}. Come and enjoy the soft life with me.` : `My Tenant is ${nameOf(s, t)}. Obviously.`, { focus: t });
-  }
-};
-FN_REG.pickTenant = (s, r, v) => {
-  s.tenant = v;
-  mutual(s, s.hoh, v, F, 8);
-  // Whoever thought they were the HoH's favourite takes it personally.
-  for (const h of aiIn(s)) {
-    if (h.id === s.hoh || h.id === v) continue;
-    if (rel(s, h.id, s.hoh)[F] >= 45) { bump(s, h.id, v, BF, 10); h.comp = clamp(h.comp - 4); }
-  }
-  if (s.hoh === ME) bump(s, v, ME, F, 10);
-  logEv(s, `${nameOf(s, v)} is the Tenant.`, "power");
-};
-
-function gatherAll(s, room) {
-  for (const h of inHouse(s)) { h.room = room; h.sc = null; h.with = null; h.act = "idle"; }
-  s.scenes = [];
-}
-
-// ---------------------------------------------------------------------------
-// Tuesday: wager task announced, Diary Room session
-// ---------------------------------------------------------------------------
-
-function startWager(s, r) {
-  openEvent(s, "wager", "lounge", "WAGER TASK: BALOGUN HUSTLE");
-  gatherAll(s, "lounge");
-  beat(s, "eye", "Housemates, gather in the lounge. This week's wager task is BALOGUN HUSTLE.");
-  beat(s, "eye", "On Thursday you will run market stalls in two teams, ANKARA and ASO-OKE. Buy, price and haggle.");
-  beat(s, "eye", `Make ${naira(10000000)} together and I will add a ${naira(5000000)} bonus to the prize pot. Fall short, and the pot loses ${naira(3000000)}.`);
-  beat(s, "eye", `Head of House, ${nameOf(s, s.hoh)}, split the house into two teams.`, { focus: s.hoh });
-  if (s.hoh === ME && playerIn(s)) {
-    choice(s, { k: "team", p: "Pick four housemates for your team, ANKARA.", n: 4, h: "pickTeam", o: housemateOptions(s) });
-  } else cont(s, "pickTeam", null);
-  cont(s, "wagerTeams");
-}
-
-FN_REG.pickTeam = (s, r, v) => {
-  const hoh = s.hoh;
-  let mine;
-  if (Array.isArray(v)) mine = v;
-  else mine = inHouseIds(s).filter((x) => x !== hoh).sort((a, b) => liking(s, hoh, b) - liking(s, hoh, a)).slice(0, 4);
-  const A = [hoh].concat(mine);
-  const B = inHouseIds(s).filter((x) => !A.includes(x));
-  s.teams = { ANKARA: A, "ASO-OKE": B };
-};
-FN_REG.wagerTeams = (s, r) => {
-  beat(s, "eye", `TEAM ANKARA: ${s.teams.ANKARA.map((x) => nameOf(s, x)).join(", ")}.`, { team: "ANKARA" });
-  beat(s, "eye", `TEAM ASO-OKE: ${s.teams["ASO-OKE"].map((x) => nameOf(s, x)).join(", ")}.`, { team: "ASO-OKE" });
-  beat(s, "eye", "Plan well. And watch your tills. Money has a way of... disappearing.");
-  void r;
-};
-
-function startDiary(s, r) {
-  openEvent(s, "diary", "diary", "DIARY ROOM");
-  const me = s.hm[0];
-  beat(s, "eye", `${me.name}, please come to the Diary Room.`);
-  beat(s, "eye", "Sit. Relax. Mama Eye is listening.");
-  choice(s, { k: "fav", p: `${EYE}: Who is your favourite housemate so far?`, n: 1, h: "diaryFav", o: housemateOptions(s) });
-  choice(s, { k: "snake", p: `${EYE}: And who is the biggest snake in this house?`, n: 1, h: "diarySnake", o: housemateOptions(s) });
-  choice(s, {
-    k: "mood", p: `${EYE}: How are you really feeling?`, n: 1, h: "diaryMood",
-    o: [{ v: "focused", l: "Focused. I'm here to win." }, { v: "heart", l: "Honestly? My heart is involved." }, { v: "wahala", l: "Ready for wahala. Bring it." }, { v: "home", l: "I miss home. It's hard." }],
-  });
-  cont(s, "diaryMission");
-}
-FN_REG.diaryFav = (s, r, v) => { s.diary.fav = v; bump(s, v, ME, F, 4); };
-FN_REG.diarySnake = (s, r, v) => { s.diary.snake = v; };
-FN_REG.diaryMood = (s, r, v) => {
-  const me = s.hm[0];
-  s.diary.mood = v;
-  if (v === "focused") me.fans = clamp(me.fans + 2);
-  if (v === "heart") me.fans = clamp(me.fans + 4);
-  if (v === "wahala") me.fans = clamp(me.fans + 5);
-  if (v === "home") { me.fans = clamp(me.fans + 3); me.comp = clamp(me.comp + 10); }
-  beat(s, "eye", "Thank you. Nigeria will be watching.");
-};
-FN_REG.diaryMission = (s, r) => {
-  // A secret mission from Mama Eye.
-  const ai = aiIn(s).map((h) => h.id);
-  const kinds = ["fight", "laugh", "gift", "kiss"];
-  const k = r.pick(kinds);
-  let m;
-  if (k === "fight") {
-    let best = null, bv = -1;
-    for (const a of ai) for (const b of ai) if (a < b) { const v = rel(s, a, b)[BF] + rel(s, b, a)[BF] + r.int(20); if (v > bv) { bv = v; best = [a, b]; } }
-    m = { k, pair: best, text: `Get ${nameOf(s, best[0])} and ${nameOf(s, best[1])} to have a fight before Thursday midnight.` };
-  } else if (k === "laugh") { const w = r.pick(ai); m = { k, who: w, text: `Make ${nameOf(s, w)} laugh twice before Thursday midnight.` }; }
-  else if (k === "gift") { const w = r.pick(ai); m = { k, who: w, text: `Give ${nameOf(s, w)} a gift before Thursday midnight.` }; }
-  else m = { k, text: "Share a kiss with any housemate before Thursday midnight." };
-  s.ev.data.mission = m;
-  choice(s, { k: "mission", p: `${EYE}: One more thing. A secret mission, for 300 House Coins. ${m.text}`, n: 1, h: "missionPick", o: [{ v: "yes", l: "ACCEPT THE MISSION" }, { v: "no", l: "DECLINE" }] });
-};
-FN_REG.missionPick = (s, r, v) => {
-  if (v === "yes") { s.mission = Object.assign({ done: false, until: 4 }, s.ev.data.mission); addGist(s, "gist", `Secret mission: ${s.mission.text}`, "mission", []); beat(s, "eye", "Good. Tell no one."); }
-  else beat(s, "eye", "As you wish.");
-};
-
-// ---------------------------------------------------------------------------
-// Wednesday: nominations
-// ---------------------------------------------------------------------------
-
-function startNoms(s, r) {
-  openEvent(s, "noms", "diary", "NOMINATIONS");
-  beat(s, "eye", "Housemates, it is nomination day.");
-  beat(s, "eye", "One by one, in the Diary Room, you will SAVE two housemates. The four with the fewest saves are up for eviction.");
-  if (s.hoh) beat(s, "eye", `${nameOf(s, s.hoh)} is Head of House and cannot be nominated.`);
-  const opts = inHouse(s).filter((h) => !h.human && h.id !== s.hoh).map((h) => ({ v: h.id, l: h.name, sub: promiseSub(s, h.id) }));
-  choice(s, { k: "saves", p: `${EYE}: ${s.hm[0].name}, who do you want to SAVE this week? Pick two.`, n: 2, h: "noms", o: opts, auto: "nomsAuto" });
-  cont(s, "nomsDone");
-}
-function promiseSub(s, id) { return s.prom[id + ">" + ME] ? "Promised to save you" : inSquad(s, id) ? "Squad" : ""; }
-
-FN_REG.nomsAuto = (s, r) => computeNoms(s, r, null);
-FN_REG.noms = (s, r, v) => computeNoms(s, r, v);
-FN_REG.nomsDone = (s, r) => {
-  beat(s, "eye", "Thank you. Nominations are closed. The results will be revealed tonight at eight.");
-  void r;
-};
-
-function aiSaves(s, r, id) {
-  const pool = inHouseIds(s).filter((x) => x !== id && x !== s.hoh);
-  const score = (x) => {
-    let v = liking(s, id, x) + r.int(20);
-    if (s.prom[id + ">" + x]) v += 28;
-    if (s.squads.some((q) => q.members.includes(id) && q.members.includes(x))) v += 25;
-    if (isSab(s, id) && isSab(s, x)) v += 40;
-    if (isSab(s, id)) v -= threatOf(s, x) * 0.3;
-    v += hmOf(s, x).fans * 0.08;
-    return v;
-  };
-  return pool.map((x) => [x, score(x)]).sort((a, b) => b[1] - a[1]).slice(0, 2).map((z) => z[0]);
-}
-
-function computeNoms(s, r, mine) {
-  const saves = {};
-  const tally = {};
-  for (const id of inHouseIds(s)) tally[id] = 0;
-  for (const h of inHouse(s)) {
-    const pick = h.human ? (mine || aiSaves(s, r, ME)) : aiSaves(s, r, h.id);
-    saves[h.id] = pick;
-    for (const x of pick) tally[x] += 1;
-  }
-  s.saves = saves;
-  s.tally = tally;
-  const elig = inHouse(s).filter((h) => h.id !== s.hoh && !h.immune);
-  const auto = elig.filter((h) => h.strikes >= 3).map((h) => h.id);
-  const rest = elig.filter((h) => !auto.includes(h.id)).map((h) => ({ id: h.id, t: tally[h.id], f: h.fans + r.f() }));
-  rest.sort((a, b) => a.t - b.t || a.f - b.f);
-  s.noms = auto.concat(rest.map((z) => z.id)).slice(0, 4);
-  // Broken promises are remembered.
-  for (const h of inHouse(s)) {
-    for (const [k, v] of Object.entries(s.prom)) {
-      if (v !== "save") continue;
-      const [a, b] = k.split(">");
-      if (a === h.id && !saves[a].includes(b) && b !== s.hoh) remember(s, b, { k: "broke", x: a });
-    }
-  }
-  // The player learns who their own saves were, nothing else.
-  if (mine) addGist(s, "gist", `You saved ${mine.map((x) => nameOf(s, x)).join(" and ")}.`, "mysaves", mine.slice());
-}
-
-function startNomReveal(s, r) {
-  openEvent(s, "nomreveal", "lounge", "NOMINATIONS REVEALED");
-  gatherAll(s, "lounge");
-  beat(s, "eye", "Housemates, please gather in the lounge.");
-  beat(s, "eye", "The following housemates are up for eviction this week.");
-  for (const id of s.noms) {
-    const h = hmOf(s, id);
-    h.comp = clamp(h.comp - 18);
-    h.fans = clamp(h.fans + 3);
-    // Nominees decide who did this to them.
-    if (id !== ME) {
-      const blame = inHouseIds(s).filter((x) => x !== id).sort((p, q) => liking(s, id, p) - liking(s, id, q))[0];
-      if (blame) bump(s, id, blame, BF, 12);
-    }
-    beat(s, "eye", `${nameOf(s, id)}.`, { focus: id, anim: "shock" });
-    if (id !== ME && r.chance(0.7)) beat(s, id, r.pick(["Wow. Okay. I see how it is.", "I'm not surprised. I know who did this.", "It's fine. Nigeria will save me.", "Chai! After everything?"]));
-  }
-  if (s.noms.includes(ME)) { beat(s, "sys", "You're nominated. Lobby the Head of House for the Veto, win fans, and pray."); tweet(s, r, "noms", ME); }
-  else beat(s, "sys", "You're safe. For now. The nominees will be lobbying hard tomorrow.");
-  beat(s, "eye", `Tomorrow morning, the Head of House, ${nameOf(s, s.hoh)}, will decide whether to use the Veto.`);
-  // Broken promises to the player come to light.
-  for (const [k, v] of Object.entries(s.prom)) {
-    const [a, b] = k.split(">");
-    if (b === ME && v === "save" && s.saves && s.saves[a] && !s.saves[a].includes(ME)) {
-      addGist(s, "gist", `${nameOf(s, a)} promised to save you. You'll find out on Sunday if they kept it.`, "promise:" + a, [a]);
-    }
-  }
-  logEv(s, `Nominated: ${s.noms.map((x) => nameOf(s, x)).join(", ")}.`, "noms");
-}
-
-// ---------------------------------------------------------------------------
-// Thursday: Veto, then the wager task
-// ---------------------------------------------------------------------------
-
-function startVeto(s, r) {
-  openEvent(s, "veto", "lounge", "THE VETO");
-  gatherAll(s, "lounge");
-  beat(s, "eye", `Head of House, ${nameOf(s, s.hoh)}, will you use your Veto Power?`, { focus: s.hoh });
-  if (s.hoh === ME && playerIn(s)) {
-    choice(s, { k: "veto", p: "Use the Veto to save one nominee?", n: 1, h: "vetoPick", o: s.noms.map((x) => ({ v: x, l: `SAVE ${nameOf(s, x)}` })).concat([{ v: "none", l: "KEEP THE NOMINATIONS" }]) });
-  } else cont(s, "vetoAI");
-}
-
-FN_REG.vetoPick = (s, r, v) => {
-  if (v === "none") { beat(s, ME, "I'm keeping the nominations the same."); return; }
-  s.vetoed = v;
-  s.noms = s.noms.filter((x) => x !== v);
-  bump(s, v, ME, F, 18); bump(s, v, ME, TR, 12);
-  beat(s, ME, `I'm using my Veto to save ${nameOf(s, v)}.`, { focus: v });
-  choice(s, { k: "repl", p: "Name a replacement nominee.", n: 1, h: "vetoRepl", o: replacementOptions(s) });
-};
-function replacementOptions(s) { return inHouse(s).filter((h) => !h.human && h.id !== s.hoh && !s.noms.includes(h.id) && h.id !== s.vetoed && !h.immune).map((h) => ({ v: h.id, l: h.name })); }
-FN_REG.vetoRepl = (s, r, v) => {
-  s.noms.push(v);
-  bump(s, v, ME, BF, 25);
-  hmOf(s, v).comp = clamp(hmOf(s, v).comp - 15);
-  beat(s, v, "Me?! You'll regret this.", { focus: v, anim: "angry" });
-  logEv(s, `${s.hm[0].name} vetoed ${nameOf(s, s.vetoed)} and nominated ${nameOf(s, v)}.`, "power");
-};
-FN_REG.vetoAI = (s, r) => {
-  const hoh = s.hoh;
-  const hh = hmOf(s, hoh);
-  if (!hh || hh.out) { beat(s, "eye", "There is no Head of House to use the Veto. The nominations stand."); return; }
-  const best = s.noms.map((x) => [x, liking(s, hoh, x) + (s.prom[hoh + ">" + x] ? 30 : 0) + (x === ME && s.prom[hoh + ">" + ME] ? 10 : 0)]).sort((a, b) => b[1] - a[1])[0];
-  if (best && best[1] >= 55) {
-    const v = best[0];
-    s.vetoed = v;
-    s.noms = s.noms.filter((x) => x !== v);
-    const cands = inHouseIds(s).filter((x) => x !== hoh && !s.noms.includes(x) && x !== v && !hmOf(s, x).immune);
-    const repl = cands.sort((a, b) => liking(s, hoh, a) - liking(s, hoh, b))[0];
-    s.noms.push(repl);
-    bump(s, v, hoh, F, 18); bump(s, repl, hoh, BF, 25);
-    hmOf(s, repl).comp = clamp(hmOf(s, repl).comp - 15);
-    beat(s, hoh, `I'm using my Veto to save ${nameOf(s, v)}.`, { focus: v });
-    beat(s, hoh, `And in their place, I nominate... ${nameOf(s, repl)}.`, { focus: repl, anim: "point" });
-    if (repl !== ME) beat(s, repl, r.pick(["Wow. Just wow.", "So this is how you play? Okay.", "I'll see you at the Showdown."]), { anim: "angry" });
-    else beat(s, "sys", "You've been put up as the replacement nominee. Time to fight for your life.");
-    logEv(s, `${nameOf(s, hoh)} vetoed ${nameOf(s, v)} and nominated ${nameOf(s, repl)}.`, "power");
-  } else {
-    beat(s, hoh, "I won't be using the Veto. The nominations stay.");
-  }
-};
-
-function startHustle(s, r) {
-  openEvent(s, "hustle", "arena", "BALOGUN HUSTLE");
-  gatherAll(s, "arena");
-  if (!s.teams) FN_REG.pickTeam(s, r, null);
-  const myTeam = s.teams.ANKARA.includes(ME) ? "ANKARA" : "ASO-OKE";
-  beat(s, "eye", "Housemates, the market is open! BALOGUN HUSTLE starts now.");
-  beat(s, "eye", "Three rounds. Buy stock, set your price, and haggle with every customer. Every naira counts.");
-  if (s.hm[0].role === "S") beat(s, "whisper", "The till is right there. Nobody counts every note...", { whisper: 1 });
-  mini(s, { g: "hustle", h: "hustleScore", team: myTeam, mates: s.teams[myTeam].filter((x) => x !== ME), sab: s.hm[0].role === "S", hard: s.hm[0].comp < 30 });
-  cont(s, "hustleEnd");
-}
-FN_REG.hustleScore = (s, r, v) => { s.ev.data.my = v; };
-FN_REG.hustleEnd = (s, r) => {
-  const my = s.ev.data.my || { profit: 0, skim: 0 };
-  const res = { ANKARA: 0, "ASO-OKE": 0, skim: 0, skimmers: [] };
-  for (const team of ["ANKARA", "ASO-OKE"]) {
-    for (const id of s.teams[team]) {
-      const h = hmOf(s, id);
-      if (!h || h.out) continue;
-      if (id === ME) { res[team] += my.profit; if (my.skim) { res.skim += my.skim; res.skimmers.push(ME); } continue; }
-      res[team] += BY[id].bz * 280000 + r.int(500000) - (h.comp < 35 ? 200000 : 0);
-      if (isSab(s, id)) {
-        const amt = 200000 + r.int(400000) + s.plan.skim * 150000;
-        res.skim += amt;
-        res.skimmers.push(id);
-        // Who saw it?
-        for (const w of s.teams[team]) {
-          if (w === id || isSab(s, w)) continue;
-          if (w === ME) { if (r.chance(0.35)) { addGist(s, "receipt", `During the hustle you saw ${nameOf(s, id)} slip cash from the till into their pocket.`, `skim:${id}`, [id]); note(s, `You saw ${nameOf(s, id)} pocket money from the till!`, "good"); } }
-          else if (r.chance(BY[w].ob * 0.09)) { remember(s, w, { k: "saw_skim", x: id }); bump(s, w, id, SU, 30); }
-        }
-      }
-    }
-  }
-  if (my.skim) {
-    for (const w of s.teams[s.teams.ANKARA.includes(ME) ? "ANKARA" : "ASO-OKE"]) {
-      if (w === ME || isSab(s, w)) continue;
-      if (r.chance(BY[w].ob * 0.05 + my.skim / 8000000)) { remember(s, w, { k: "saw_skim", x: ME }); bump(s, w, ME, SU, 30); s.hm[0].sus += 6; }
-    }
-  }
-  s.plan.skim = 0;
-  s.wager = res;
-  beat(s, "eye", "Time! Stalls closed. Put your money in the box. Results tomorrow at eleven.");
-};
-
-// ---------------------------------------------------------------------------
-// Friday: wager results, Midnight Strike
-// ---------------------------------------------------------------------------
-
-function startWresult(s, r) {
-  openEvent(s, "wresult", "lounge", "WAGER RESULTS");
-  gatherAll(s, "lounge");
-  const w = s.wager || { ANKARA: 0, "ASO-OKE": 0, skim: 0 };
-  const a = Math.max(0, w.ANKARA), b = Math.max(0, w["ASO-OKE"]);
-  const gross = a + b;
-  const net = Math.max(0, gross - w.skim);
-  beat(s, "eye", "Housemates, the wager results are in.");
-  beat(s, "eye", `Team ANKARA made ${naira(a)}. Team ASO-OKE made ${naira(b)}.`, { ledger: { ANKARA: a, "ASO-OKE": b } });
-  if (w.skim > 0) beat(s, "eye", `But when we counted the boxes... ${naira(w.skim)} was missing.`, { anim: "shock", missing: w.skim });
-  const win = net >= 10000000;
-  if (win) { s.pot += net + 5000000; beat(s, "eye", `Total: ${naira(net)}. You hit the target! The prize pot grows by ${naira(net + 5000000)}.`, { anim: "cheer" }); }
-  else { s.pot = Math.max(0, s.pot + net - 3000000); beat(s, "eye", `Total: ${naira(net)}. You missed the target. After the penalty, the prize pot stands at ${naira(s.pot)}.`); }
-  beat(s, "eye", `PRIZE POT: ${naira(s.pot)}.`);
-  logEv(s, `Wager task: ${naira(net)} banked${w.skim ? `, ${naira(w.skim)} missing` : ""}. Pot: ${naira(s.pot)}.`, "wager");
-  const myTeam = s.teams && s.teams.ANKARA.includes(ME) ? "ANKARA" : "ASO-OKE";
-  if ((myTeam === "ANKARA" ? a >= b : b >= a) && playerIn(s)) { s.hm[0].coins += 150; note(s, "Your team won the hustle. +150 coins.", "good"); }
-  if (w.skim > 0) {
-    // Everybody gets a little paranoid.
-    for (const h of aiIn(s)) for (const x of inHouseIds(s)) if (x !== h.id && r.chance(0.2)) bump(s, h.id, x, SU, 4);
-    beat(s, "eye", "Somebody in this house is stealing from all of you. Think about that.");
-  }
-}
-
-function strikeEvent(s, r) {
-  s.done[s.day + ":strike"] = true;
-  const me = s.hm[0];
-  if (me.role === "S" && !me.out) {
-    openEvent(s, "strike", "redroom", "THE MIDNIGHT STRIKE");
-    beat(s, "whisper", "It is midnight. It is time.");
-    const top = topThreat(s);
-    const partner = s.sabs.find((x) => x !== ME);
-    if (partner && !hmOf(s, partner).out && top) beat(s, partner, `I say ${nameOf(s, top)}. They're too close to the truth.`);
-    choice(s, { k: "strike", p: `${WHISPER}: Choose who will not see Saturday.`, n: 1, h: "strikePick", o: housemateOptions(s, (h) => !isSab(s, h.id)) });
-    return true;
-  }
-  const alive = s.sabs.filter((x) => !hmOf(s, x).out);
-  if (alive.length) s.struck = topThreat(s);
-  return false;
-}
-FN_REG.strikePick = (s, r, v) => { s.struck = v; beat(s, "whisper", `${nameOf(s, v)}. Sleep well. They won't.`); };
-
-// ---------------------------------------------------------------------------
-// Saturday: the strike is revealed, the party
-// ---------------------------------------------------------------------------
-
-function startStrikeReveal(s, r) {
-  openEvent(s, "strikereveal", "kitchen", "THE MORNING AFTER");
-  gatherAll(s, "kitchen");
-  const x = s.struck;
-  if (!x || !hmOf(s, x) || hmOf(s, x).out) { beat(s, "eye", "Housemates... the Saboteurs did not strike last night. Enjoy your breakfast."); return; }
-  const h = hmOf(s, x);
-  beat(s, "eye", "Housemates... please gather in the kitchen.");
-  beat(s, "eye", "Last night, the Saboteurs struck.");
-  beat(s, "eye", `${h.name} has been struck from the house.`, { focus: x, anim: "shock", out: x });
-  h.out = { how: "struck", d: s.day };
-  s.noms = s.noms.filter((z) => z !== x);
-  if (s.hoh === x) beat(s, "eye", "The Head of House is gone. The house is without a leader.");
-  logEv(s, `${h.name} was struck by the Saboteurs.`, "strike");
-  tweet(s, r, "strike", x);
-  for (const o of aiIn(s)) {
-    const v = rel(s, o.id, x);
-    if (v[F] >= 50 || v[RO] >= 40) { o.comp = clamp(o.comp - 14); }
-    // The house turns on whoever had beef with the struck housemate.
-    for (const y of inHouseIds(s)) if (y !== o.id && rel(s, y, x)[BF] >= 45 && r.chance(0.5)) bump(s, o.id, y, SU, 8);
-  }
-  if (x === ME) {
-    beat(s, "sys", "YOU HAVE BEEN STRUCK. The Saboteurs got you. You can watch the rest of the week.");
-    s.hm[0].room = "out";
-  } else {
-    const friend = aiIn(s).sort((a, b) => rel(s, b.id, x)[F] - rel(s, a.id, x)[F])[0];
-    if (friend) beat(s, friend.id, r.pick([`No! Not ${h.name}! Whoever did this, I will find you.`, `${h.name} was the realest person here. This is personal now.`, "I can't breathe. Who is doing this?"]), { anim: "sad" });
-  }
-}
-
-function startParty(s, r) {
-  openEvent(s, "party", "arena", "SATURDAY NIGHT: OWAMBE");
-  gatherAll(s, "arena");
-  beat(s, "eye", "Housemates, it's Saturday night. The DJ is here. The zobo is cold. OWAMBE!", { anim: "dance" });
-  if (playerIn(s)) {
-    choice(s, {
-      k: "dancemode", p: "The DANCE-OFF is starting. How are you playing it?", n: 1, h: "danceMode",
-      o: [{ v: "battle", l: "BATTLE A RIVAL", sub: "Win and your fans explode" }, { v: "crush", l: "DANCE WITH YOUR CRUSH", sub: "Romance, in front of everyone" }, { v: "vibe", l: "JUST VIBE", sub: "Solo, no pressure" }],
-    });
-  }
-  cont(s, "partyDrama");
-}
-FN_REG.danceMode = (s, r, v) => {
-  s.ev.data.mode = v;
-  if (v === "vibe") mini(s, { g: "dance", h: "danceScore", mode: v, vs: null, hard: s.hm[0].comp < 30 });
-  else choice(s, { k: "dancewith", p: v === "battle" ? "Who are you battling?" : "Who are you dancing with?", n: 1, h: "danceWith", o: housemateOptions(s) });
-};
-FN_REG.danceWith = (s, r, v) => {
-  s.ev.data.vs = v;
-  const rival = hmOf(s, v);
-  s.ev.data.rival = 50 + BY[v].dn * 7 + r.int(15) - (rival.comp < 35 ? 8 : 0);
-  mini(s, { g: "dance", h: "danceScore", mode: s.ev.data.mode, vs: v, rival: s.ev.data.rival, hard: s.hm[0].comp < 30 });
-};
-FN_REG.danceScore = (s, r, v) => {
-  const me = s.hm[0];
-  const d = s.ev.data;
-  const sc = v;
-  if (d.mode === "vibe") { me.fans = clamp(me.fans + Math.round(sc / 20)); me.comp = clamp(me.comp + 10); beat(s, "sys", `You danced your heart out. Accuracy ${sc}%. Fans +${Math.round(sc / 20)}.`); }
-  else if (d.mode === "battle") {
-    const win = sc >= d.rival;
-    const vs = d.vs;
-    if (win) { me.fans = clamp(me.fans + 10); hmOf(s, vs).comp = clamp(hmOf(s, vs).comp - 10); bump(s, vs, ME, BF, 10); beat(s, vs, "Okay, okay! You won. Don't let it enter your head.", { anim: "angry" }); beat(s, "sys", `You won the battle ${sc}% to ${d.rival}%! Fans +10.`); logEv(s, `${me.name} won a dance battle against ${nameOf(s, vs)}.`, "party"); }
-    else { me.fans = clamp(me.fans + 3); beat(s, vs, "Sit down! This floor is mine!", { anim: "dance" }); beat(s, "sys", `${nameOf(s, vs)} won ${d.rival}% to ${sc}%. Fans +3 for trying.`); hmOf(s, vs).fans = clamp(hmOf(s, vs).fans + 5); }
-  } else {
-    const vs = d.vs;
-    const good = sc >= 55;
-    bump(s, vs, ME, RO, good ? 12 : 4); bump(s, vs, ME, F, 5); me.fans = clamp(me.fans + (good ? 7 : 3));
-    jealousy(s, r, vs, aiIn(s), 10);
-    beat(s, vs, good ? "You can really move. I'm impressed." : "Hahaha! You stepped on my foot. But it was cute.", { anim: "dance" });
-    if (good && rel(s, vs, ME)[RO] >= 60) { const sh = makeShip(s, r, ME, vs, true); beat(s, "sys", `The whole house is screaming. #${sh.name} is trending.`); }
-  }
-};
-FN_REG.partyDrama = (s, r) => {
-  const ai = aiIn(s);
-  let n = 0;
-  // Ships get closer at parties.
-  for (const sh of s.ships.slice()) {
-    if (n >= 2) break;
-    if (sh.a === ME || sh.b === ME) continue;
-    const A = hmOf(s, sh.a), B = hmOf(s, sh.b);
-    if (!A || !B || A.out || B.out) continue;
-    if (rel(s, sh.a, sh.b)[RO] >= 55 && r.chance(0.7)) {
-      mutual(s, sh.a, sh.b, RO, 8); makeShip(s, r, sh.a, sh.b, true);
-      beat(s, "sys", `${A.name} and ${B.name} are slow-dancing. Then... they kiss. #${sh.name}`, { focus: sh.a, anim: "kiss", pair: [sh.a, sh.b] });
-      tweet(s, r, "kiss", sh.a, sh.b, sh.name);
-      n++;
-    }
-  }
-  // Jealousy or beef boils over.
-  let best = null, bv = 60;
-  for (const a of ai) for (const b of ai) if (a.id < b.id) { const v = rel(s, a.id, b.id)[BF] + rel(s, b.id, a.id)[BF]; if (v > bv) { bv = v; best = [a.id, b.id]; } }
-  if (best) {
-    const [a, b] = best;
-    beat(s, a, r.pick(["You've been looking for my trouble all week!", "Say that again! Say it!", "Don't dance near me!"]), { anim: "angry", pair: [a, b] });
-    beat(s, b, r.pick(["Abeg, who is even looking at you?", "Go and sit down!", "Security! Mama Eye!"]), { anim: "angry" });
-    mutual(s, a, b, BF, 10);
-    for (const id of [a, b]) { const h = hmOf(s, id); if (BY[id].tp >= 4 && r.chance(0.5)) { strike(s, r, id, "fighting at the party"); beat(s, "eye", `${h.name}, that is a strike.`); } }
-    logEv(s, `${nameOf(s, a)} and ${nameOf(s, b)} clashed at the party.`, "fight");
-    tweet(s, r, "fight", a, b);
-  }
-  // Kunle's wild side, for the fans.
-  const k = hmOf(s, "kunle");
-  if (k && !k.out && r.chance(0.5)) { beat(s, "kunle", "Pastor K is off duty tonight! DJ, run it back!", { anim: "dance" }); k.fans = clamp(k.fans + 6); }
-  beat(s, "eye", "Lights out, housemates. Tomorrow is the Live Eviction Show.");
-};
-
-// ---------------------------------------------------------------------------
-// Sunday: Live Eviction Show and THE SHOWDOWN
-// ---------------------------------------------------------------------------
-
-function startLive(s, r) {
-  openEvent(s, "live", "arena", "LIVE EVICTION SHOW");
-  gatherAll(s, "arena");
-  const me = s.hm[0];
-  beat(s, "dapo", "Good evening, Nigeria! This is the LIVE EVICTION SHOW!", { anim: "cheer" });
-  const hi = s.log.filter((l) => ["kiss", "fight", "strike", "power", "lie", "accuse"].includes(l.k)).slice(-3);
-  if (hi.length) { beat(s, "dapo", "What. A. Week. Let's recap."); for (const l of hi) beat(s, "dapo", l.t); }
-  if (s.diary.snake && playerIn(s) && !hmOf(s, s.diary.snake).out) {
-    const sn = s.diary.snake;
-    beat(s, "dapo", `${me.name}. In the Diary Room, you called ${nameOf(s, sn)} "the biggest snake in the house".`, { focus: ME });
-    beat(s, sn, r.pick(["Me?! A snake?! Say it to my face!", "Wow. Okay. I'll remember this.", "Hahaha. Interesting. Very interesting."]), { anim: "angry" });
-    bump(s, sn, ME, BF, 25); me.fans = clamp(me.fans + 6);
-  }
-  const noms = s.noms.filter((x) => !hmOf(s, x).out);
-  if (noms.length < 2) { beat(s, "dapo", "With fewer than two nominees standing, there will be no eviction tonight!"); cont(s, "showdown"); return; }
-  beat(s, "dapo", `This week's nominees: ${noms.map((x) => nameOf(s, x)).join(", ")}.`);
-  beat(s, "dapo", "Nigeria has voted. Two of you will face the housemates' vote.");
-  const ranked = noms.map((x) => ({ x, v: hmOf(s, x).fans + r.int(12) })).sort((a, b) => a.v - b.v);
-  const bottom = ranked.slice(0, 2).map((z) => z.x);
-  s.bottom = bottom;
-  for (const z of ranked.slice(2).reverse()) beat(s, "dapo", `${nameOf(s, z.x)}... you are SAFE!`, { focus: z.x, anim: "cheer" });
-  beat(s, "dapo", `THE BOTTOM TWO: ${nameOf(s, bottom[0])} and ${nameOf(s, bottom[1])}.`, { focus: bottom[0], pair: bottom });
-  beat(s, "dapo", "Housemates, please cast your eviction vote in the Diary Room.");
-  if (playerIn(s) && !bottom.includes(ME)) {
-    choice(s, { k: "evict", p: "Who do you vote to EVICT?", n: 1, h: "evictVote", o: bottom.map((x) => ({ v: x, l: `EVICT ${nameOf(s, x)}` })), auto: "evictAuto" });
-  } else cont(s, "evictAuto");
-}
-
-FN_REG.evictVote = (s, r, v) => tallyEvict(s, r, v);
-FN_REG.evictAuto = (s, r) => tallyEvict(s, r, null);
-
-function tallyEvict(s, r, mine) {
-  const [a, b] = s.bottom;
-  const votes = { [a]: 0, [b]: 0 };
-  const who = {};
-  for (const h of inHouse(s)) {
-    if (h.id === a || h.id === b) continue;
-    let v;
-    if (h.human) { if (!mine) continue; v = mine; }
-    else {
-      let la = liking(s, h.id, a) + r.int(12), lb = liking(s, h.id, b) + r.int(12);
-      if (isSab(s, h.id)) { la -= threatOf(s, a) * 0.4; lb -= threatOf(s, b) * 0.4; if (isSab(s, a)) la += 80; if (isSab(s, b)) lb += 80; }
-      v = la < lb ? a : b;
-    }
-    votes[v] += 1; who[h.id] = v;
-  }
-  let out = votes[a] > votes[b] ? a : votes[b] > votes[a] ? b : null;
-  if (!out) {
-    const hoh = s.hoh && !hmOf(s, s.hoh).out ? s.hoh : null;
-    if (hoh && hoh !== a && hoh !== b) out = liking(s, hoh, a) < liking(s, hoh, b) ? a : b;
-    else out = hmOf(s, a).fans <= hmOf(s, b).fans ? a : b;
-  }
-  s.evictVotes = who;
-  beat(s, "dapo", `The votes are in. ${votes[a]} for ${nameOf(s, a)}. ${votes[b]} for ${nameOf(s, b)}.`, { votes });
-  beat(s, "dapo", `${nameOf(s, out)}, you have been evicted from Wahala House.`, { focus: out, anim: "shock", out });
-  const h = hmOf(s, out);
-  h.out = { how: "evicted", d: s.day };
-  logEv(s, `${h.name} was evicted.`, "evict");
-  if (out === ME) { beat(s, "sys", "YOU HAVE BEEN EVICTED. Stay for the Showdown."); s.hm[0].room = "out"; }
-  else beat(s, out, r.pick(["It's been real. Watch your backs. Seriously.", "No regrets. I played my game.", "To the Saboteurs: I know who you are."]));
-  cont(s, "showdown");
-}
-
-FN_REG.showdown = (s, r) => {
-  const me = s.hm[0];
-  beat(s, "dapo", "Before we say goodnight... it's time for THE SHOWDOWN.", { anim: "point" });
-  beat(s, "dapo", "Anyone may call out one housemate as a Saboteur. If more than half the house backs the call, the accused must reveal.");
-  if (playerIn(s)) {
-    choice(s, { k: "callout", p: "CALL OUT A SABOTEUR", n: 1, h: "callout", o: housemateOptions(s).concat([{ v: "pass", l: "PASS" }]), auto: "calloutAuto" });
-  } else cont(s, "calloutAuto");
-  void me;
-};
-FN_REG.callout = (s, r, v) => resolveShowdown(s, r, v === "pass" ? null : v);
-FN_REG.calloutAuto = (s, r) => resolveShowdown(s, r, null);
-
-function resolveShowdown(s, r, mine) {
-  const callers = {};
-  const add = (from, to) => { (callers[to] = callers[to] || []).push(from); };
-  if (mine) add(ME, mine);
-  for (const h of aiIn(s)) {
-    if (isSab(s, h.id)) {
-      // Saboteurs pile on whoever the house already suspects most.
-      let best = null, bv = 0;
-      for (const x of inHouseIds(s)) { if (isSab(s, x)) continue; const tot = aiIn(s).reduce((acc, o) => acc + (o.id === x ? 0 : rel(s, o.id, x)[SU]), 0); if (tot > bv) { bv = tot; best = x; } }
-      if (best && r.chance(0.6)) add(h.id, best);
+    // What this bot actually saw.
+    const sawIt = b.saw.find((w) => w.k === "strike" && pOf(s, w.who) && pOf(s, w.who).alive && !isSab(p));
+    if (sawIt) {
+      const killer = pOf(s, sawIt.who);
+      b.sus[killer.id] = 200;
+      say(s, p, t, `I SEE AM! ${killer.name} strike ${nameOf(s, sawIt.victim)} for the ${ROOMS_SAID(sawIt.room)}! Vote ${killer.name}!`, killer.id, "ev");
       continue;
     }
-    let best = null, bv = 48;
-    for (const x of inHouseIds(s)) { if (x === h.id) continue; const v = rel(s, h.id, x)[SU] + (mine === x ? rel(s, h.id, ME)[TR] / 5 : 0); if (v > bv) { bv = v; best = x; } }
-    if (best) add(h.id, best);
-  }
-  const ranked = Object.entries(callers).sort((a, b) => b[1].length - a[1].length);
-  const houseN = inHouse(s).length;
-  if (!ranked.length) { beat(s, "dapo", "Silence! Nobody dares. The Saboteurs live to fight another week."); cont(s, "finish"); return; }
-  for (const [x, list] of ranked.slice(0, 3)) beat(s, "dapo", `${list.length} ${list.length === 1 ? "housemate calls" : "housemates call"} out ${nameOf(s, x)}.`, { focus: x, callers: list });
-  const [target, list] = ranked[0];
-  if (list.length * 2 > houseN - 1) {
-    const th = hmOf(s, target);
-    beat(s, "dapo", `${th.name}, the house has spoken. Stand up. Are you a Saboteur?`, { focus: target });
-    if (isSab(s, target)) {
-      beat(s, target, "...I AM A SABOTEUR.", { anim: "shock", reveal: target });
-      th.out = { how: "ejected", d: s.day };
-      const share = Math.floor(2000000 / list.length);
-      s.pot = Math.max(0, s.pot - 2000000);
-      if (list.includes(ME)) { s.hm[0].coins += Math.floor(share / 1000); s.hm[0].fans = clamp(s.hm[0].fans + 12); }
-      for (const c of list) hmOf(s, c).fans = clamp(hmOf(s, c).fans + 6);
-      beat(s, "dapo", `${th.name} is EJECTED! The callers split ${naira(2000000)} from the pot.`, { anim: "cheer", out: target });
-      logEv(s, `${th.name} was exposed as a Saboteur at the Showdown.`, "sab");
-      s.exposed = (s.exposed || []).concat([target]);
-    } else {
-      beat(s, target, "I AM A HOUSEMATE!", { anim: "angry" });
-      beat(s, "dapo", "WRONG! Every housemate who called them out takes two strikes!");
-      for (const c of list) { const h = hmOf(s, c); h.strikes += 2; if (c === ME) note(s, "Two strikes for a wrong call-out.", "strike"); }
-      th.fans = clamp(th.fans + 8);
-      logEv(s, `${th.name} was wrongly accused at the Showdown.`, "accuse");
+    if (isSab(p)) {
+      const others = living(s).filter((q) => q.id !== p.id && !isSab(q));
+      if (R.chance(s, 0.5) && others.length) {
+        const mark = R.pick(s, others);
+        b.sus[mark.id] = (b.sus[mark.id] || 0) + 30;
+        say(s, p, t, R.pick(s, [`${mark.name} dey move sus. Always following people around.`, `Where was ${mark.name}? I never see them doing any chore.`, `${mark.name} was close to the ${where}. Just saying.`]), mark.id, "acc");
+      } else {
+        const last = b.rooms.length ? b.rooms[b.rooms.length - 1].room : "lounge";
+        say(s, p, t, R.pick(s, [`I was in the ${ROOMS_SAID(last)} doing my chores.`, "No be me o. I was busy with my chores.", "Skip am. We no get evidence."]));
+      }
+      continue;
     }
-  } else {
-    beat(s, "dapo", "Not enough support. The Saboteurs live to fight another week.");
-  }
-  cont(s, "finish");
-}
-
-FN_REG.finish = (s, r) => {
-  beat(s, "dapo", "That's all for tonight, Nigeria! Week One is DONE. See you next week on... WAHALA HOUSE!", { anim: "cheer" });
-  cont(s, "recap");
-};
-FN_REG.recap = (s, r) => { s.result = buildRecap(s); void r; };
-
-function buildRecap(s) {
-  const me = s.hm[0];
-  const all = s.hm.slice().sort((a, b) => b.fans - a.fans);
-  const rank = all.findIndex((h) => h.id === ME) + 1;
-  const myShips = s.ships.filter((sh) => sh.a === ME || sh.b === ME).map((sh) => ({ with: sh.a === ME ? sh.b : sh.a, name: sh.name, official: sh.official }));
-  const myBeefs = aiIn(s).concat(s.hm.filter((h) => h.out && !h.human)).filter((h) => rel(s, h.id, ME)[BF] >= 45).map((h) => h.id);
-  const besties = s.hm.filter((h) => !h.human && rel(s, h.id, ME)[F] >= 65).map((h) => h.id);
-  let headline;
-  if (me.out && me.out.how === "struck") headline = "STRUCK BY THE SABOTEURS";
-  else if (me.out && me.out.how === "evicted") headline = "EVICTED";
-  else if (me.out && me.out.how === "ejected") headline = "EXPOSED AS A SABOTEUR";
-  else headline = me.role === "S" ? "SURVIVED AS A SABOTEUR" : "SURVIVED WEEK ONE";
-  let grade = 0;
-  if (!me.out) grade += 40;
-  grade += Math.round(me.fans / 3);
-  grade += Math.min(10, myShips.length * 5) + Math.min(10, besties.length * 3);
-  if (me.role === "S") { if (s.struck && s.struck !== ME) grade += 10; if (!(s.exposed || []).includes(ME)) grade += 5; }
-  else if ((s.exposed || []).length) grade += 15;
-  const letter = grade >= 90 ? "S" : grade >= 75 ? "A" : grade >= 60 ? "B" : grade >= 45 ? "C" : "D";
-  return {
-    headline, grade: letter, score: grade, role: me.role, out: me.out, fans: me.fans, rank, of: s.hm.length,
-    ships: myShips, beefs: myBeefs, besties, receipts: s.gb.filter((g) => g.k === "receipt").length,
-    lies: s.lies.length, exposedLies: s.lies.filter((l) => l.exposed).length,
-    pot: s.pot, struck: s.struck, sabs: s.sabs.slice(), exposed: s.exposed || [],
-    hoh: s.hoh, evicted: s.hm.filter((h) => h.out && h.out.how === "evicted").map((h) => h.id),
-    fanBoard: all.map((h) => ({ id: h.id, fans: h.fans, out: h.out ? h.out.how : null })),
-  };
-}
-
-/** Register named continuations and choice handlers in one table. */
-const FN = FN_REG;
-FN.entryPlan = entryPlan;
-// ---------------------------------------------------------------------------
-// Drama: grudges from day one, crowds at every fight, and housemates who come
-// looking for you (to confront you, flirt with you, bring gist, or cut a deal).
-// ---------------------------------------------------------------------------
-
-/** Two pairs of clashing personalities walk in with a grudge. */
-function seedRivalries(s, r) {
-  const known = new Set(HISTORY.map(([a, b]) => [a, b].sort().join("+")));
-  const pairs = [];
-  for (let i = 0; i < AI_IDS.length; i++) for (let j = i + 1; j < AI_IDS.length; j++) {
-    const a = AI_IDS[i], b = AI_IDS[j];
-    if (known.has([a, b].sort().join("+"))) continue;
-    const clash = BY[a].tp + BY[b].tp + (BY[a].sc >= 4) + (BY[b].sc >= 4) + Math.abs(BY[a].mo - BY[b].mo) * 0.5 + r.int(4);
-    pairs.push([clash, a, b]);
-  }
-  pairs.sort((p, q) => q[0] - p[0]);
-  const used = new Set();
-  s.rivals = [];
-  for (const [, a, b] of pairs) {
-    if (used.has(a) || used.has(b)) continue;
-    for (const [p, q] of [[a, b], [b, a]]) { const v = rel(s, p, q); v[BF] = 40 + r.int(10); v[F] = 10 + r.int(8); v[TR] = 10 + r.int(8); }
-    used.add(a); used.add(b);
-    s.rivals.push([a, b]);
-    if (s.rivals.length >= 2) break;
-  }
-}
-
-/** A fight or a kiss draws a crowd. */
-function gatherCrowd(s, r, sc) {
-  if (sc.room === "hoh") return;
-  const pool = r.shuffle(aiIn(s).filter((h) => !h.sc && !h.watch && h.act !== "sleep" && h.id !== sc.a && h.id !== sc.b && ROAM_ROOMS.includes(h.room)));
-  let n = 0;
-  for (const h of pool) {
-    if (n >= 3) break;
-    const here = h.room === sc.room;
-    if (!r.chance(here ? 0.85 : 0.2 + BY[h.id].ob * 0.07)) continue;
-    if (!here) { h.room = sc.room; h.spot = freeSpot(s, r, sc.room, h.id); }
-    h.act = "watch";
-    h.watch = sc.id;
-    n += 1;
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Housemates who come to you
-// ---------------------------------------------------------------------------
-
-const APPROACH_TITLE = { confront: "WAHALA INCOMING", crush: "SOMEBODY IS CRUSHING", gist: "FRESH GIST", deal: "A DEAL ON THE TABLE", curious: "NOSY HOUSEMATE" };
-
-const DRAMA = {
-  confrontLie: [
-    "{you}! So you told {to} that I {claim}? I heard everything!",
-    "{ex} {you}, come here. You've been telling people I {claim}? To my face, smile; behind my back, lies?",
-    "You think this house doesn't talk? {to} told me what you said about me.",
-  ],
-  confrontLieTo: [
-    "{you}, you lied to me. {about} never {claimPast}. I asked. Why would you do that?",
-    "{ex} You made me look like a fool in front of {about}. Explain yourself.",
-  ],
-  confrontBeef: [
-    "{you}. You and me, we need to talk. Now.",
-    "{ex} I'm tired of the way you move in this house. Say what you want to say to my face.",
-    "Every time I enter a room, you go quiet. What's your problem with me?",
-    "You think I don't see you rolling your eyes at me? I see everything.",
-  ],
-  sorryOk: ["Fine. I hear you. Don't let it happen again.", "Okay... I accept. But I'm watching you.", "Hmm. At least you came correct. We move."],
-  sorryNo: ["Sorry for yourself. I'm not buying it.", "Keep your sorry. Actions, not words.", "Ehen? Now you're sorry? Because you got caught?"],
-  denyOk: ["...Maybe I heard wrong. But I'm keeping my eyes open.", "Hmm. Okay. If you say so."],
-  denyNo: ["Liar! Look me in the eye and lie again!", "Ahn ahn! Even your face is lying! Everybody heard it!"],
-  clapYou: ["You want smoke? Because I have plenty.", "Lower your voice. You're not my mate.", "Say it again. I dare you."],
-  clapThem: ["{ex} You see this one? You see?!", "Hold me! Somebody hold me!", "This house is not big enough for both of us."],
-  walk: ["You walk away. Behind you, {me} is still shouting.", "You leave {me} mid-sentence. The house goes quiet."],
-  crushOpen: [
-    "{you}... can I steal you for a minute? Just you.",
-    "{ex} I've been looking for you all day. Don't laugh.",
-    "Is it just me, or does this house get brighter when you walk in?",
-    "I don't do this, but... I like you, {pet}. There, I said it.",
-  ],
-  crushYes: ["See this smile? You did that.", "Okay, now I can't stop smiling. Thanks a lot.", "Don't play with my heart, {pet}."],
-  crushOut: ["Wait, for real? Yes! Yes, a thousand times!", "{ex} The fans are going to scream. Yes!"],
-  crushOutNo: ["Slow down, {pet}. Let's not rush it.", "Ha! Buy me jollof first."],
-  crushFriend: ["Friends. Yeah. Okay. That's... cool.", "I hear you. Friends it is."],
-  crushNo: ["Wow. Okay. Noted.", "Your loss, honestly.", "I'll pretend this conversation never happened."],
-  gistOpen: ["{you}, come closer. I have gist, and I trust you with it.", "Don't look now. Act normal. I need to tell you something.", "{ex} You won't believe what I saw."],
-  thanks: ["Keep it between us, eh?", "You didn't hear it from me.", "Now you know. Do what you want with it."],
-  dealOpen: [
-    "Look, {you}. Wednesday is coming. I save you, you save me. Simple.",
-    "Let's be smart about this. You and me, we protect each other at nominations. Deal?",
-    "{ex} Numbers win this game. Save me on Wednesday and I've got you. Word.",
-  ],
-  dealYes: ["Pleasure doing business.", "Shake on it. Don't make me regret this.", "Smart. Very smart."],
-  dealNo: ["Your call. Don't come crying on Wednesday.", "Okay o. Remember I offered."],
-};
-const CLAIM_PAST = { likes: "said they had a crush on me", hates: "said anything bad about me", fake: "played anybody", sab: "did anything shady", using: "used me" };
-const CLAIM_SHORT = { likes: "have a crush on {to}", hates: "talk bad about {to}", fake: "am fake", sab: "am a Saboteur", using: "am using {to}" };
-
-/** Something this housemate saw or heard that is worth telling you. */
-function gistFor(s, id) {
-  const mem = s.mem[id] || [];
-  const order = ["saw_skim", "saw_scheme", "kiss", "overheard", "gossip", "broke", "fight"];
-  for (const k of order) {
-    for (let i = mem.length - 1; i >= 0; i--) {
-      const m = mem[i];
-      if (m.k !== k || m.shared) continue;
-      if (m.x === ME || m.src === ME || m.y === ME) continue;
-      if (m.x && hmOf(s, m.x).out) continue;
-      return m;
-    }
-  }
-  return null;
-}
-
-/** Maybe a housemate walks over to you. Runs on the half hour while roaming. */
-function maybeApproach(s, r) {
-  const me = s.hm[0];
-  if (me.out || s.phase !== "ROAM" || s.min >= 1440 || s.min < 540) return false;
-  const now = s.day * 1440 + s.min;
-  if (now - (s.lastApproach === undefined ? -9999 : s.lastApproach) < 280) return false;
-  const by = s.approachedBy || {};
-  const cands = [];
-  for (const h of aiIn(s)) {
-    if (h.sc || h.watch || h.act === "sleep") continue;
-    if (h.room === "hoh" && s.hoh !== ME && s.tenant !== ME) continue;
-    const v = rel(s, h.id, ME);
-    const rested = now - (by[h.id] === undefined ? -9999 : by[h.id]) >= 1440;
-    const lie = s.lies.find((l) => l.exposed && !l.confronted && (l.to === h.id || l.about === h.id));
-    if (lie) { cands.push({ h, k: "confront", w: 200, lie }); continue; }
-    if (!rested) continue;
-    if (v[BF] >= 45 || (v[BF] >= 36 && BY[h.id].tp >= 4)) { cands.push({ h, k: "confront", w: v[BF] + BY[h.id].tp * 5 }); continue; }
-    const ship = findShip(s, ME, h.id);
-    const drawn = v[RO] >= 42 || (BY[h.id].fl >= 4 && v[AT] >= 62 && v[BF] < 25);
-    if (drawn && !(ship && ship.official) && !(s.asked && s.asked[h.id] >= s.day)) { cands.push({ h, k: "crush", w: v[RO] + v[AT] * 0.3 }); continue; }
-    if ((s.informant === h.id || (v[F] >= 32 && v[TR] >= 26)) && gistFor(s, h.id)) { cands.push({ h, k: "gist", w: v[F] * 0.7 + (s.informant === h.id ? 30 : 0) }); continue; }
-    if (s.day <= 1 && (BY[h.id].wt >= 4 || BY[h.id].ob >= 4 || BY[h.id].fl >= 4) && !(s.curious && s.curious[h.id])) cands.push({ h, k: "curious", w: 20 + r.int(10) });
-    if (BY[h.id].sc >= 4 && s.day >= 1 && s.day <= 3 && !s.done["3:noms"] && v[TR] >= 30 && !s.prom[h.id + ">" + ME] && !(s.dealt && s.dealt[h.id])) cands.push({ h, k: "deal", w: 35 });
-  }
-  if (!cands.length) return false;
-  if (!r.chance(cands.some((c) => c.lie) ? 0.9 : 0.5)) return false;
-  cands.sort((a, b) => b.w - a.w);
-  s.lastApproach = now;
-  s.approachedBy = Object.assign({}, by, { [cands[0].h.id]: now });
-  startApproach(s, r, cands[0]);
-  return true;
-}
-
-function startApproach(s, r, c) {
-  const me = s.hm[0], h = c.h, id = h.id;
-  if (h.room !== me.room) { h.room = me.room; h.spot = freeSpot(s, r, me.room, id); }
-  h.act = "idle";
-  openEvent(s, "approach", "here", APPROACH_TITLE[c.k]);
-  s.ev.data = { who: id, k: c.k };
-  if (c.k === "confront") {
-    if (c.lie) {
-      c.lie.confronted = true;
-      const L = c.lie;
-      const angry = L.about === id ? DRAMA.confrontLie : DRAMA.confrontLieTo;
-      const t = r.pick(angry).replace(/\{to\}/g, nameOf(s, L.to)).replace(/\{about\}/g, nameOf(s, L.about))
-        .replace(/\{claimPast\}/g, CLAIM_PAST[L.c] || "said that").replace(/\{claim\}/g, (CLAIM_SHORT[L.c] || "said things").replace(/\{to\}/g, nameOf(s, L.to)));
-      beat(s, id, fill(s, r, t, id), { approach: id, anim: "angry", key: 1 });
-      s.ev.data.lie = true;
-    } else beat(s, id, fill(s, r, r.pick(DRAMA.confrontBeef), id), { approach: id, anim: "angry", key: 1 });
-    choice(s, {
-      k: "confront", p: `${h.name} is in your face. What do you do?`, n: 1, h: "confrontPick", ctx: id,
-      o: [
-        { v: "sorry", l: "Apologize", sub: "Swallow your pride" },
-        { v: "deny", l: "Deny everything", sub: s.ev.data.lie ? "Risky: they've heard it" : "Play it cool" },
-        { v: "clap", l: "Clap back", sub: "Fans love it. They won't" },
-        { v: "walk", l: "Walk away", sub: "No drama... this time" },
-      ],
-    });
-  } else if (c.k === "crush") {
-    s.asked = s.asked || {};
-    s.asked[id] = s.day;
-    beat(s, id, fill(s, r, r.pick(DRAMA.crushOpen), id, { romantic: true }), { approach: id, anim: "heart", key: 1 });
-    choice(s, {
-      k: "crush", p: `${h.name} likes you. Your move.`, n: 1, h: "crushPick", ctx: id,
-      o: [
-        { v: "flirt", l: "Flirt back", sub: "Turn up the heat" },
-        { v: "out", l: "Ask them out", sub: "Make it official" },
-        { v: "friend", l: "Keep it friendly", sub: "Gently" },
-        { v: "no", l: "Not interested", sub: "Ouch" },
-      ],
-    });
-  } else if (c.k === "gist") {
-    const m = gistFor(s, id);
-    m.shared = true;
-    s.ev.data.mem = m;
-    beat(s, id, fill(s, r, r.pick(DRAMA.gistOpen), id), { approach: id, anim: "sneak", key: 1 });
-    beat(s, id, gistLine(s, m), { key: 1 });
-    shareGist(s, id, m);
-    choice(s, {
-      k: "gist", p: `What do you say to ${h.name}?`, n: 1, h: "gistPick", ctx: id,
-      o: [
-        { v: "thanks", l: "Thank them", sub: "Friendship +" },
-        { v: "eyes", l: "\"Keep your eyes open for me\"", sub: "Trust +" },
-        { v: "doubt", l: "\"Why are you telling me?\"", sub: "Suspicious" },
-      ],
-    });
-  } else if (c.k === "curious") {
-    s.curious = s.curious || {};
-    s.curious[id] = true;
-    const q = r.pick(["crush", "trust", "snake"]);
-    s.ev.data.q = q;
-    const ask = { crush: "So... who's your crush in this house? Talk true. I won't tell anybody. Maybe.", trust: "Real question. Who do you actually trust in here?", snake: "Between us: who's the biggest snake in this house?" }[q];
-    beat(s, id, fill(s, r, `{ex} ${ask}`, id), { approach: id, anim: "sassy", key: 1 });
-    const pool = r.shuffle(aiIn(s).filter((x) => x.id !== id)).slice(0, 3);
-    choice(s, {
-      k: "curious", p: `${h.name} wants to know. What do you say?`, n: 1, h: "curiousPick", ctx: id,
-      o: pool.map((x) => ({ v: x.id, l: x.name, sub: q === "crush" ? "They'll hear about it" : q === "trust" ? "They'll hear about it" : "They will DEFINITELY hear about it" }))
-        .concat([{ v: id, l: q === "snake" ? "You, honestly" : "You, obviously", sub: q === "snake" ? "Bold" : "Smooth" }, { v: "none", l: "I'm not telling you", sub: "Mysterious" }]),
-    });
-  } else {
-    s.dealt = s.dealt || {};
-    s.dealt[id] = true;
-    beat(s, id, fill(s, r, r.pick(DRAMA.dealOpen), id), { approach: id, anim: "talk", key: 1 });
-    choice(s, {
-      k: "deal", p: `${h.name} wants a save deal for Wednesday.`, n: 1, h: "dealPick", ctx: id,
-      o: [
-        { v: "yes", l: "Deal", sub: "Break it and they'll know" },
-        { v: "no", l: "No deals", sub: "Trust -" },
-      ],
-    });
-  }
-}
-
-function gistLine(s, m) {
-  const N = (x) => nameOf(s, x);
-  switch (m.k) {
-    case "saw_skim": return `At the market, I saw ${N(m.x)} slip money from the till into their pocket. I'm not crazy.`;
-    case "saw_scheme": return `Late last night, ${N(m.x)} and ${N(m.y)} were whispering in a corner. They went quiet the second I walked in.`;
-    case "kiss": return `Did you know ${N(m.x)} and ${N(m.y)} kissed? The whole ${m.room ? m.room : "house"} saw it.`;
-    case "overheard": return `${N(m.src)} has been talking about ${N(m.x)} behind their back. Badly.`;
-    case "gossip": return `${N(m.src)} told me ${N(m.x)} is not who they pretend to be.`;
-    case "broke": return `${N(m.x)} promised to save me and didn't. Watch your back with that one.`;
-    case "fight": return `You missed it! ${N(m.x)} and ${N(m.y)} nearly fought in the ${m.room || "house"}. Somebody was about to throw a slipper.`;
-    default: return "Something is going on in this house. Keep your eyes open.";
-  }
-}
-
-function shareGist(s, id, m) {
-  const src = nameOf(s, id);
-  if (m.k === "saw_skim") addGist(s, "receipt", `${src} told you they saw ${nameOf(s, m.x)} pocket money from the till.`, `skim:${m.x}`, [m.x]);
-  else if (m.k === "saw_scheme") addGist(s, "receipt", `${src} saw ${nameOf(s, m.x)} and ${nameOf(s, m.y)} scheming late at night.`, `sab:${m.x} sab:${m.y}`, [m.x, m.y]);
-  else if (m.k === "overheard" || m.k === "gossip") addGist(s, "gist", `${src}: ${nameOf(s, m.src)} has been talking about ${nameOf(s, m.x)}.`, `hates:${m.src}>${m.x}`, [m.src, m.x]);
-  else if (m.k === "kiss") addGist(s, "gist", `${src}: ${nameOf(s, m.x)} and ${nameOf(s, m.y)} kissed.`, `kiss:${m.x}+${m.y}`, [m.x, m.y]);
-  else if (m.k === "broke") addGist(s, "gist", `${src}: ${nameOf(s, m.x)} broke a save promise.`, `broke:${m.x}`, [m.x]);
-  else if (m.k === "fight") addGist(s, "gist", `${src}: ${nameOf(s, m.x)} and ${nameOf(s, m.y)} had a big fight.`, `beef:${m.x}+${m.y}`, [m.x, m.y]);
-  note(s, "New gist in your Gist Book.", "good");
-}
-
-FN_REG.confrontPick = (s, r, v, id) => {
-  const me = s.hm[0], h = hmOf(s, id), c = BY[id];
-  const lie = s.ev.data && s.ev.data.lie;
-  if (v === "sorry") {
-    const p = 0.35 + (5 - c.tp) * 0.1 - (lie ? 0.15 : 0) + liking(s, id, ME) / 250;
-    beat(s, ME, r.pick(["I'm sorry. I was wrong, and I own it.", "You're right. I'm sorry. Can we start again?", "My bad. Honestly. I'm sorry."]), { anim: "sad" });
-    if (r.chance(p)) { bump(s, id, ME, BF, -18); bump(s, id, ME, F, 5); beat(s, id, fill(s, r, r.pick(DRAMA.sorryOk), id), { anim: "talk2", key: 1 }); }
-    else { bump(s, id, ME, BF, 4); beat(s, id, fill(s, r, r.pick(DRAMA.sorryNo), id), { anim: "angry", key: 1 }); }
-    me.comp = clamp(me.comp - 4);
-  } else if (v === "deny") {
-    const p = lie ? 0.22 + me.fans / 400 + rel(s, id, ME)[TR] / 300 : 0.5;
-    beat(s, ME, r.pick(["Me? Never. Somebody is feeding you lies.", "I don't know what you're talking about.", "Check your sources, because it wasn't me."]), { anim: "sassy" });
-    if (r.chance(p)) { bump(s, id, ME, BF, -6); beat(s, id, fill(s, r, r.pick(DRAMA.denyOk), id), { anim: "talk2", key: 1 }); }
-    else { bump(s, id, ME, TR, -15); bump(s, id, ME, BF, 10); me.fans = clamp(me.fans - 3); beat(s, id, fill(s, r, r.pick(DRAMA.denyNo), id), { anim: "angry", key: 1 }); tweet(s, r, "youbad", ME); }
-  } else if (v === "clap") {
-    beat(s, ME, r.pick(DRAMA.clapYou), { anim: "angry" });
-    beat(s, id, fill(s, r, r.pick(DRAMA.clapThem), id), { anim: "angry", key: 1 });
-    mutual(s, id, ME, BF, 15);
-    me.fans = clamp(me.fans + 6); me.comp = clamp(me.comp - 10); h.comp = clamp(h.comp - 10);
-    addBeef(s, id, ME);
-    tweet(s, r, "fight", id, ME);
-    logEv(s, `${h.name} and ${me.name} had a screaming match.`, "fight");
-    for (const w of aiIn(s)) if (w.id !== id && w.room === me.room) remember(s, w.id, { k: "fight", x: id, y: ME });
-    if (c.tp >= 4 && r.chance(0.35)) { strike(s, r, id, "threatening another housemate"); beat(s, "eye", `${h.name}, that is a strike.`, { key: 1 }); }
-    else if (r.chance(0.15)) { strike(s, r, ME, "fighting"); beat(s, "eye", `${me.name}, that is a strike.`, { key: 1 }); }
-  } else {
-    bump(s, id, ME, BF, 5); me.fans = clamp(me.fans - 2); me.comp = clamp(me.comp + 3);
-    beat(s, "sys", fill(s, r, r.pick(DRAMA.walk), id));
-  }
-};
-
-FN_REG.crushPick = (s, r, v, id) => {
-  const me = s.hm[0], h = hmOf(s, id);
-  const theirs = rel(s, id, ME)[RO];
-  if (v === "flirt") {
-    beat(s, ME, r.pick(["Funny, I was about to come looking for you.", "Keep talking. I like where this is going.", "You're trouble. I like trouble."]), { anim: "heart" });
-    mutual(s, id, ME, RO, 10); me.fans = clamp(me.fans + 2);
-    beat(s, id, fill(s, r, r.pick(DRAMA.crushYes), id, { romantic: true }), { anim: "happy", key: 1 });
-    if (rel(s, id, ME)[RO] >= 55 && rel(s, ME, id)[RO] >= 40) makeShip(s, r, ME, id, false);
-    jealousy(s, r, id, aiIn(s), 6);
-  } else if (v === "out") {
-    beat(s, ME, r.pick(["Be my person in this house. Officially.", "Let's stop pretending. You and me?"]), { anim: "heart" });
-    if (theirs >= 58 || r.chance(theirs / 120)) {
-      mutual(s, id, ME, RO, 15);
-      const sh = makeShip(s, r, ME, id, true);
-      me.fans = clamp(me.fans + 8);
-      beat(s, id, fill(s, r, r.pick(DRAMA.crushOut), id, { romantic: true }), { anim: "cheer", key: 1 });
-      beat(s, "sys", `It's official. #${sh.name} is trending.`, { key: 1 });
-      tweet(s, r, "ship", ME, id, sh.name);
-      jealousy(s, r, id, aiIn(s), 12);
-    } else { bump(s, id, ME, RO, 3); beat(s, id, fill(s, r, r.pick(DRAMA.crushOutNo), id, { romantic: true }), { anim: "sassy", key: 1 }); }
-  } else if (v === "friend") {
-    bump(s, id, ME, RO, -8); bump(s, id, ME, F, 6);
-    beat(s, id, fill(s, r, r.pick(DRAMA.crushFriend), id), { anim: "talk2", key: 1 });
-  } else {
-    bump(s, id, ME, RO, -25); bump(s, id, ME, BF, 8); h.comp = clamp(h.comp - 8); me.fans = clamp(me.fans + 1);
-    beat(s, id, fill(s, r, r.pick(DRAMA.crushNo), id), { anim: "sad", key: 1 });
-  }
-};
-
-FN_REG.gistPick = (s, r, v, id) => {
-  if (v === "thanks") { bump(s, id, ME, F, 4); bump(s, id, ME, TR, 4); beat(s, id, fill(s, r, r.pick(DRAMA.thanks), id), { anim: "happy" }); }
-  else if (v === "eyes") { bump(s, id, ME, TR, 7); s.informant = id; beat(s, id, "Say less. If I see anything, you'll be the first to know.", { anim: "talk2" }); }
-  else { bump(s, id, ME, TR, -6); beat(s, id, "Wow. I try to help, and this is what I get?", { anim: "sassy" }); }
-};
-
-FN_REG.dealPick = (s, r, v, id) => {
-  const h = hmOf(s, id);
-  if (v === "yes") {
-    s.prom[id + ">" + ME] = "save"; s.prom[ME + ">" + id] = "save";
-    mutual(s, id, ME, TR, 8);
-    beat(s, id, fill(s, r, r.pick(DRAMA.dealYes), id), { anim: "happy", key: 1 });
-    note(s, `You promised to save ${h.name} on Wednesday.`, "info");
-  } else { bump(s, id, ME, TR, -4); beat(s, id, fill(s, r, r.pick(DRAMA.dealNo), id), { anim: "sassy" }); }
-};
-
-FN_REG.curiousPick = (s, r, v, id) => {
-  const q = s.ev.data.q, h = hmOf(s, id), me = s.hm[0];
-  if (v === "none") { bump(s, id, ME, TR, -3); beat(s, id, "Hmm. Mysterious. I'll find out anyway.", { anim: "sassy" }); return; }
-  if (v === id) {
-    if (q === "snake") { bump(s, id, ME, BF, 12); me.fans = clamp(me.fans + 3); beat(s, id, "ME?! Wow. Okay. Noted, and remembered.", { anim: "angry", key: 1 }); }
-    else { bump(s, id, ME, q === "crush" ? RO : TR, 12); bump(s, id, ME, F, 5); beat(s, id, q === "crush" ? "Stop it! You're making me blush." : "Aww. That means a lot. Truly.", { anim: q === "crush" ? "heart" : "happy", key: 1 }); }
-    return;
-  }
-  const x = hmOf(s, v);
-  // A nosy housemate never keeps it to themselves.
-  if (q === "crush") { bump(s, ME, v, RO, 8); bump(s, v, ME, AT, 10); remember(s, id, { k: "crushtalk", x: v }); beat(s, id, `${x.name}?! Oh, this house is going to be fun.`, { anim: "cheer", key: 1 }); if (r.chance(0.6)) { bump(s, v, ME, RO, 6); note(s, `Word travels. ${x.name} heard you have a crush on them.`, "love"); } }
-  else if (q === "trust") { bump(s, v, ME, F, 6); bump(s, v, ME, TR, 6); bump(s, id, ME, TR, -3); beat(s, id, `${x.name}? Interesting choice. Very interesting.`, { anim: "talk2", key: 1 }); }
-  else { bump(s, v, ME, BF, r.chance(0.6) ? 14 : 4); me.fans = clamp(me.fans + 2); beat(s, id, `${x.name}! I KNEW it. I knew I wasn't the only one.`, { anim: "cheer", key: 1 }); if (r.chance(0.6)) note(s, `${x.name} found out you called them a snake.`, "bad"); }
-};
-// ---------------------------------------------------------------------------
-// Things to do all day: free activities in the rooms, and one house incident
-// a day that drags everybody in.
-// ---------------------------------------------------------------------------
-
-/** Free activities: where they can be done, how often, and how long they take. */
-const DOINGS = {
-  chores: { rooms: ["kitchen", "lounge"], perDay: 3, ticks: 3 },
-  cook: { rooms: ["kitchen"], perDay: 1, ticks: 6 },
-  snoop: { rooms: ["bedroom"], perDay: 2, ticks: 2 },
-  prank: { rooms: ["lounge", "garden", "kitchen"], perDay: 1, ticks: 2 },
-};
-
-function doneToday(s, what) { return (s.doings && s.doings[s.day + ":" + what]) || 0; }
-
-function canDo(s, what) {
-  const me = s.hm[0], d = DOINGS[what];
-  if (!d) return "Unknown activity.";
-  if (me.out) return "You are no longer in the house.";
-  if (!d.rooms.includes(me.room)) return `You can't do that in here.`;
-  if (doneToday(s, what) >= d.perDay) return what === "cook" ? "You already cooked for the house today." : "That's enough of that for today.";
-  if (what === "prank" && !inHouse(s).some((h) => !h.human && h.room === me.room && h.act !== "sleep")) return "Nobody here to prank.";
-  return null;
-}
-
-function doThing(s, r, what) {
-  const me = s.hm[0];
-  s.doings = s.doings || {};
-  s.doings[s.day + ":" + what] = doneToday(s, what) + 1;
-  const here = aiIn(s).filter((h) => h.room === me.room && h.act !== "sleep");
-  const names = (list) => list.map((h) => h.name).join(" and ");
-  if (what === "chores") {
-    me.coins += 40;
-    for (const h of here) bump(s, h.id, ME, F, 2 + (BY[h.id].mo >= 4 ? 2 : 0));
-    const seen = here.filter((h) => BY[h.id].mo >= 4 || BY[h.id].ob >= 4);
-    note(s, `You ${me.room === "kitchen" ? "washed every plate in the sink" : "tidied the lounge"}. +40 coins.${seen.length ? ` ${names(seen.slice(0, 2))} noticed.` : ""}`, "good");
-  } else if (what === "cook") {
-    const pot = r.pick(["a big pot of party jollof", "egusi and pounded yam", "pepper soup", "fried rice and dodo", "beans and plantain"]);
-    for (const h of aiIn(s)) { bump(s, h.id, ME, F, 5); bump(s, h.id, ME, TR, 2); }
-    me.fans = clamp(me.fans + 3);
-    const chef = hmOf(s, "nkoyo");
-    const verdict = chef && !chef.out ? (r.chance(0.55) ? "Nkoyo had seconds. High praise." : "Nkoyo said it needed more pepper.") : "The plates came back empty.";
-    note(s, `You cooked ${pot} for the house. ${verdict}`, "good");
-    logEv(s, `${me.name} cooked ${pot} for the whole house.`, "nice");
-  } else if (what === "snoop") {
-    const beds = aiIn(s).filter((h) => h.id !== ME);
-    const target = r.pick(beds);
-    const watchers = here.filter((h) => h.id !== target.id);
-    const caught = r.chance(0.12 + watchers.reduce((a, h) => a + BY[h.id].ob * 0.05, 0) + (target.room === "bedroom" ? 0.3 : 0));
-    if (caught) {
-      const by = watchers.length ? r.pick(watchers) : target;
-      bump(s, target.id, ME, BF, 18); bump(s, target.id, ME, TR, -15); me.fans = clamp(me.fans - 2);
-      if (by.id !== target.id) remember(s, by.id, { k: "snoop", x: ME, y: target.id });
-      note(s, `${by.name} caught you going through ${target.name}'s bag! This will travel.`, "bad");
-      logEv(s, `${me.name} was caught going through ${target.name}'s things.`, "lie");
-      return;
-    }
-    if (isSab(s, target.id) && r.chance(0.55)) {
-      const clue = r.pick([`a folded note in ${target.name}'s bag: "Friday. Midnight. Choose well."`, `a second set of till receipts hidden in ${target.name}'s shoe`, `${target.name}'s notebook with every housemate's name, some crossed out`]);
-      addGist(s, "receipt", `You found ${clue}.`, `sab:${target.id}`, [target.id]);
-      note(s, `You found something in ${target.name}'s bag. Check your Gist Book.`, "good");
-    } else if (SECRETS[target.id] && r.chance(0.5)) {
-      addGist(s, "secret", `${target.name}'s diary: "${SECRETS[target.id]}"`, `secret:${target.id}`, [target.id]);
-      note(s, `You read a page of ${target.name}'s diary. A secret is in your Gist Book.`, "good");
-    } else note(s, `You went through ${target.name}'s things. Just clothes, perfume and three bottles of hair cream.`, "info");
-  } else if (what === "prank") {
-    const target = r.pick(here);
-    const c = BY[target.id];
-    const funny = r.chance(0.35 + c.wt * 0.1 - c.tp * 0.06);
-    const trick = r.pick(["swapped the sugar for salt in their tea", "hid their slippers in the freezer", "replaced their hair cream with mayonnaise", "set an alarm under their pillow"]);
-    if (funny) {
-      for (const h of here) bump(s, h.id, ME, F, 3);
-      bump(s, target.id, ME, F, 4); me.fans = clamp(me.fans + 4);
-      note(s, `You ${trick}. ${target.name} laughed hardest. The house is screaming.`, "good");
-      tweet(s, r, "funny", ME);
-    } else {
-      bump(s, target.id, ME, BF, 12); me.fans = clamp(me.fans + 2);
-      note(s, `You ${trick}. ${target.name} did NOT find it funny.`, "bad");
-      logEv(s, `${me.name} pranked ${target.name} and it went badly.`, "fight");
+    // Housemates: who was last seen with the victim, and who was near the body's room lately?
+    const vs = victim && b.seen[victim.id];
+    const sameRoom = vs && vs.room === m.room;
+    const withVictim = vs && s.now - vs.at < (sameRoom ? 60000 : 30000) ? Object.entries(b.seen).filter(([id, v]) => id !== p.id && id !== victim.id && v.room === vs.room && Math.abs(v.at - vs.at) < 12000 && pOf(s, id) && pOf(s, id).alive && !b.clear[id]).map(([id]) => id) : [];
+    for (const id of withVictim) b.sus[id] = (b.sus[id] || 0) + (sameRoom ? (withVictim.length === 1 ? 40 : 18) : 8);
+    const near = Object.entries(b.seen).filter(([id, v]) => id !== p.id && v.room === m.room && s.now - v.at < 25000 && pOf(s, id) && pOf(s, id).alive).map(([id]) => id);
+    for (const id of near) b.sus[id] = (b.sus[id] || 0) + 10;
+    if (withVictim.length && (sameRoom || R.chance(s, 0.3)) && R.chance(s, 0.85)) {
+      const id = withVictim.length === 1 ? withVictim[0] : R.pick(s, withVictim);
+      say(s, p, t, R.pick(s, [`I last saw ${victim.name} with ${nameOf(s, id)} in the ${ROOMS_SAID(vs.room)}.`, `${nameOf(s, id)}, you were with ${victim.name} in the ${ROOMS_SAID(vs.room)}. Explain.`]), id, sameRoom ? "ev" : "acc");
+    } else if (m.kind === "body" && near.length && R.chance(s, 0.8)) {
+      const id = R.pick(s, near);
+      say(s, p, t, R.pick(s, [`${nameOf(s, id)} was around the ${where} just now.`, `I saw ${nameOf(s, id)} near the ${where}. Hmm.`]), id, "acc");
+    } else if (R.chance(s, 0.65)) {
+      const last = b.rooms.length ? b.rooms[b.rooms.length - 1].room : "lounge";
+      say(s, p, t, R.pick(s, [`I was in the ${ROOMS_SAID(last)}.`, `I was doing chores in the ${ROOMS_SAID(last)}.`, "Who was alone just now?", "Skip am if nobody see anything."]));
     }
   }
 }
 
-// ---------------------------------------------------------------------------
-// House incidents: one a day, early afternoon to evening.
-// ---------------------------------------------------------------------------
+const ACCUSE_RE = /\b(sus|vote|saw|see am|kill|strike|struck|liar|lie|lying|did it|na (him|her|am)|guilty|fake)\b/i;
+const VOUCH_RE = /\b(clear|safe|with me|innocent|not (him|her)|trust)\b/i;
 
-function maybeIncident(s, r) {
-  const me = s.hm[0];
-  if (me.out || s.phase !== "ROAM" || s.day < 1 || s.day > 6) return false;
-  if (s.min < 780 || s.min > 1140) return false;
-  s.incidents = s.incidents || {};
-  if (s.incidents[s.day]) return false;
-  // Keep clear of the next show.
-  if (nextEventMin(s) - s.min < 60) return false;
-  if (!r.chance(0.3)) return false;
-  const used = Object.values(s.incidents);
-  const pool = ["jollof", "palmwine", "nepa", "letter"].filter((k) => !used.includes(k));
-  const k = r.pick(pool.length ? pool : ["jollof", "palmwine", "nepa", "letter"]);
-  s.incidents[s.day] = k;
-  startIncident(s, r, k);
-  return true;
-}
-
-function startIncident(s, r, k) {
-  const me = s.hm[0];
-  const ai = aiIn(s);
-  if (k === "jollof") {
-    openEvent(s, "incident", "kitchen", "THE MISSING JOLLOF");
-    gatherAll(s, "kitchen");
-    const owner = hmOf(s, "nkoyo") && !hmOf(s, "nkoyo").out ? "nkoyo" : r.pick(ai).id;
-    s.ev.data = { owner };
-    beat(s, "eye", `Housemates. ${nameOf(s, owner)} cooked a pot of jollof this morning. It is gone. The pot is empty. Somebody in this house is a thief.`);
-    beat(s, owner, "I counted the pieces of meat. SEVEN pieces. Gone! Whoever did this, confess now.", { anim: "angry", key: 1 });
-    const suspects = ai.filter((h) => h.id !== owner).sort((p, q) => BY[q.id].bz + BY[q.id].fl - BY[p.id].bz - BY[p.id].fl).slice(0, 3);
-    choice(s, {
-      k: "jollof", p: `${nameOf(s, owner)} is looking at everyone. What do you do?`, n: 1, h: "jollofPick",
-      o: suspects.map((h) => ({ v: h.id, l: `Blame ${h.name}`, sub: "They will remember" })).concat([{ v: "me", l: "Confess (it was you)", sub: "Fans love honesty" }, { v: "quiet", l: "Keep quiet", sub: "Let them fight it out" }]),
-    });
-  } else if (k === "palmwine") {
-    openEvent(s, "incident", "lounge", "A GIFT FROM MAMA EYE");
-    gatherAll(s, "lounge");
-    beat(s, "eye", `${me.name}, Mama Eye has sent you a bottle of chilled palm wine. You may share it with ONE housemate. Choose carefully. Everybody is watching.`, { key: 1 });
-    choice(s, { k: "palmwine", p: "Who do you share the palm wine with?", n: 1, h: "palmwinePick", o: housemateOptions(s) });
-  } else if (k === "nepa") {
-    openEvent(s, "incident", "lounge", "NEPA TAKE LIGHT!");
-    gatherAll(s, "lounge");
-    s.dark = s.day * 1440 + s.min + 60;
-    beat(s, "sys", "The lights die. The fans stop. Somewhere, somebody screams. NEPA has taken light.", { key: 1 });
-    const flirt = ai.slice().sort((p, q) => rel(s, q.id, ME)[RO] - rel(s, p.id, ME)[RO])[0];
-    beat(s, flirt.id, "Who just touched my hand? ...Oh. It's you.", { anim: "heart" });
-    choice(s, {
-      k: "nepa", p: "It's pitch black in the lounge. What do you do?", n: 1, h: "nepaPick", ctx: flirt.id,
-      o: [
-        { v: "story", l: "Tell a ghost story", sub: "Entertain the house" },
-        { v: "hold", l: `Stay close to ${flirt.name}`, sub: "Romance in the dark" },
-        { v: "gen", l: "Go and start the generator", sub: "Be the hero" },
-        { v: "sneak", l: "Use the dark to snoop around", sub: "Risky" },
-      ],
-    });
-  } else {
-    openEvent(s, "incident", "diary", "AN ANONYMOUS LETTER");
-    beat(s, "eye", `${me.name}, a letter was slipped under the Diary Room door. It is addressed to you. Mama Eye did not write it.`);
-    // Most letters tell the truth.
-    const sabs = s.sabs.filter((x) => x !== ME && !hmOf(s, x).out);
-    const truthful = sabs.length && r.chance(0.6);
-    const named = truthful ? r.pick(sabs) : r.pick(ai.filter((h) => !isSab(s, h.id))).id;
-    s.ev.data = { named, truthful };
-    beat(s, "sys", `The letter says: "Watch ${nameOf(s, named)}. Not everything they say is true."`, { focus: named, key: 1 });
-    choice(s, {
-      k: "letter", p: "What do you do with the letter?", n: 1, h: "letterPick",
-      o: [
-        { v: "keep", l: "Keep it to yourself", sub: "Add it to your Gist Book" },
-        { v: "show", l: `Show it to ${nameOf(s, named)}`, sub: "Clear the air" },
-        { v: "burn", l: "Burn it", sub: "Somebody wants to play you" },
-      ],
-    });
+/** Bots weigh what is said in meetings, and defend themselves when named. */
+function botsHear(s, line) {
+  if (!line || line.g) return;
+  const speaker = pOf(s, line.w);
+  const named = [];
+  if (line.about) named.push(line.about);
+  else {
+    const low = ` ${line.t.toLowerCase()} `;
+    for (const p of s.ps) if (p.id !== line.w && p.name.length >= 2 && low.includes(p.name.toLowerCase())) named.push(p.id);
+  }
+  if (!named.length) return;
+  const q = line.q;
+  // How much a line moves suspicion: evidence > accusation > a defensive "na lie".
+  let weight;
+  if (line.k) weight = { ev: 18, acc: 7, def: 3, vouch: -14 }[line.k] || 0;
+  else if (q !== undefined) weight = { 2: 14, 14: 8, 3: 6, 7: 6, 13: 5, 4: -10 }[q] || 2;
+  else weight = /\b(saw|see am|with|caught)\b/i.test(line.t) && ACCUSE_RE.test(line.t) ? 12 : ACCUSE_RE.test(line.t) ? 7 : VOUCH_RE.test(line.t) ? -10 : 2;
+  const accuse = weight >= 5, vouch = weight < 0;
+  for (const p of living(s)) {
+    if (p.ctl !== "b" || p.id === line.w) continue;
+    const b = p.b || (p.b = brainNew());
+    const trust = (b.sus[line.w] || 0) > 40 ? 0.4 : 1;
+    for (const id of named) {
+      if (id === p.id) {
+        if (accuse && s.now - b.defended > 4000) {
+          b.defended = s.now;
+          const last = b.rooms.length ? b.rooms[b.rooms.length - 1].room : "lounge";
+          say(s, p, s.now + R.range(s, 1200, 2600), R.pick(s, [`Me?! I was in the ${ROOMS_SAID(last)}!`, `${exOf(p, s)} Na lie! ${speaker ? speaker.name : "You"} dey find who to blame.`, `No be me o! Check the ${ROOMS_SAID(last)}.`]), line.w, "def");
+          b.sus[line.w] = (b.sus[line.w] || 0) + 10;
+        }
+        continue;
+      }
+      if (isSab(p)) { if (accuse) b.sus[id] = (b.sus[id] || 0) + weight; continue; }
+      if (b.clear[id]) {
+        if (accuse && !b.vouched[id] && pOf(s, id) && pOf(s, id).alive) {
+          b.vouched[id] = 1;
+          say(s, p, s.now + R.range(s, 1500, 3000), `${nameOf(s, id)} is clear. I watched them finish the ${STATIONS[b.clear[id]].label.toLowerCase().replace(/^\w+ /, "")}.`, id, "vouch");
+        }
+        continue;
+      }
+      b.sus[id] = (b.sus[id] || 0) + weight * (weight > 0 ? trust : 1);
+    }
   }
 }
 
-FN_REG.jollofPick = (s, r, v) => {
-  const me = s.hm[0], owner = s.ev.data.owner;
-  if (v === "me") {
-    me.fans = clamp(me.fans + 4); bump(s, owner, ME, BF, 8); bump(s, owner, ME, TR, 4);
-    beat(s, ME, "Okay! Okay. It was me. It was too sweet. I'm sorry.", { anim: "sad" });
-    beat(s, owner, "At least you confessed. You're washing every pot in this kitchen for a week.", { anim: "wag", key: 1 });
-  } else if (v === "quiet") {
-    const sus = r.pick(aiIn(s).filter((h) => h.id !== owner));
-    mutual(s, owner, sus.id, BF, 12);
-    beat(s, sus.id, "Why is everybody looking at me? I didn't touch anything!", { anim: "angry", focus: sus.id });
-    beat(s, owner, "Your mouth is still oily. Don't lie to me.", { anim: "angry", pair: [owner, sus.id] });
-  } else {
-    const h = hmOf(s, v);
-    mutual(s, owner, v, BF, 14); bump(s, v, ME, BF, 15); me.fans = clamp(me.fans + 2);
-    beat(s, ME, `I saw ${h.name} by the fridge this morning. Just saying.`, { anim: "wag" });
-    beat(s, v, r.pick(["ME?! You're lying! You're actually lying!", "Wow. Wow. So it's me you want to use? Okay.", "I don't even eat jollof! I'm on a diet!"]), { anim: "angry", focus: v, key: 1 });
-    if (isSab(s, v)) bump(s, owner, v, SU, 6);
-  }
-};
-
-FN_REG.palmwinePick = (s, r, v) => {
-  const h = hmOf(s, v);
-  bump(s, v, ME, F, 10); bump(s, v, ME, TR, 6);
-  if (rel(s, v, ME)[AT] >= 45) bump(s, v, ME, RO, 8);
-  jealousy(s, r, v, aiIn(s), 6);
-  beat(s, v, r.pick(["Ahhh, palm wine! You see why I like you?", "For me? Sit down, let's finish this bottle together.", "Now THIS is friendship."]), { anim: "cheer", focus: v, key: 1 });
-  const left = aiIn(s).filter((x) => x.id !== v).sort((p, q) => rel(s, q.id, ME)[F] - rel(s, p.id, ME)[F])[0];
-  if (left) { bump(s, left.id, ME, BF, 6); beat(s, left.id, `Hm. ${h.name}. Okay. I see where I stand.`, { anim: "sassy" }); }
-};
-
-FN_REG.nepaPick = (s, r, v, flirt) => {
-  const me = s.hm[0], f = hmOf(s, flirt);
-  if (v === "story") {
-    for (const h of aiIn(s)) bump(s, h.id, ME, F, 4);
-    me.fans = clamp(me.fans + 5);
-    beat(s, ME, "So there was this woman in white, standing by the gate of this very house...", { anim: "talk" });
-    beat(s, "sys", "By the end of the story, three housemates are holding hands and Tobi refuses to go to the toilet alone.", { key: 1 });
-  } else if (v === "hold") {
-    mutual(s, flirt, ME, RO, 12); me.fans = clamp(me.fans + 3);
-    jealousy(s, r, flirt, aiIn(s), 8);
-    beat(s, flirt, "If the light never comes back... I won't complain.", { anim: "heart", key: 1 });
-    beat(s, "sys", "When the lights flicker back on, the whole house sees you two. The screaming starts.", { anim: "cheer" });
-    if (rel(s, flirt, ME)[RO] >= 55) makeShip(s, r, ME, flirt, false);
-  } else if (v === "gen") {
-    for (const h of aiIn(s)) bump(s, h.id, ME, TR, 3);
-    me.fans = clamp(me.fans + 3); me.comp = clamp(me.comp + 5);
-    beat(s, "sys", "You find the generator in the dark, pull the cord four times, and the house roars back to life. Hero.", { anim: "cheer", key: 1 });
-  } else {
-    const sabs = s.sabs.filter((x) => x !== ME && !hmOf(s, x).out);
-    if (sabs.length && r.chance(0.5)) {
-      const x = r.pick(sabs);
-      addGist(s, "receipt", `In the blackout you heard ${nameOf(s, x)} whisper: "Now is the time. Nobody can see us."`, `sab:${x}`, [x]);
-      beat(s, "sys", `In the dark, you hear ${nameOf(s, x)} whisper something they shouldn't. Receipt saved.`, { key: 1 });
-    } else if (r.chance(0.4)) {
-      const by = r.pick(aiIn(s));
-      bump(s, by.id, ME, SU, 15); bump(s, by.id, ME, TR, -8);
-      beat(s, by.id, "Who is that creeping around? I can see your shadow!", { anim: "angry", key: 1 });
-    } else beat(s, "sys", "You creep around in the dark and learn nothing, except that the lounge floor is very cold.");
-  }
-  void f;
-};
-
-FN_REG.letterPick = (s, r, v) => {
-  const { named, truthful } = s.ev.data;
-  const x = nameOf(s, named);
-  if (v === "keep") {
-    addGist(s, truthful ? "receipt" : "gist", `An anonymous letter told you to watch ${x}.`, truthful ? `sab:${named}` : `letter:${named}`, [named]);
-    beat(s, "sys", "You fold the letter into your pocket. Your Gist Book has a new entry.");
-  } else if (v === "show") {
-    bump(s, named, ME, TR, 8); bump(s, named, ME, F, 4);
-    beat(s, named, truthful ? "Somebody wrote THIS about me? ...Interesting. Very interesting." : "Who would write this? Thank you for showing me. Seriously.", { anim: truthful ? "sassy" : "sad", focus: named, key: 1 });
-  } else beat(s, "sys", "The letter curls in the flame. Whoever wrote it will never know if it worked.");
-};
-// ---------------------------------------------------------------------------
-// Event dispatch
-// ---------------------------------------------------------------------------
-
-function trigger(s, r, kind) {
-  const me = s.hm[0];
-  switch (kind) {
-    case "night": if (nightEvent(s, r)) evRun(s, r); return;
-    case "hoh": startHoh(s, r); break;
-    case "wager": startWager(s, r); break;
-    case "diary": if (!me.out) startDiary(s, r); else s.done[s.day + ":diary"] = true; break;
-    case "noms": startNoms(s, r); break;
-    case "nomreveal": startNomReveal(s, r); break;
-    case "veto": startVeto(s, r); break;
-    case "hustle": startHustle(s, r); break;
-    case "wresult": startWresult(s, r); break;
-    case "strike": if (strikeEvent(s, r)) evRun(s, r); return;
-    case "strikereveal": startStrikeReveal(s, r); break;
-    case "party": startParty(s, r); break;
-    case "live": startLive(s, r); break;
-    case "sleep": newDay(s, r); if (s.mission && !s.mission.done && s.day > s.mission.until) { s.mission.done = true; s.mission.failed = true; note(s, `${EYE}: Your secret mission has expired.`, "info"); } return;
-    default: return;
-  }
-  evRun(s, r);
+function botsPlanVotes(s) {
+  const span = Math.max(3000, s.opts.vote * 1000 * 0.7);
+  for (const p of living(s)) if (p.ctl === "b") p.b.voteAt = s.now + R.range(s, 1500, span);
 }
 
-/** Advance the clock by n ticks, stopping when an event takes over. */
-function run(s, r, n) {
-  for (let i = 0; i < n; i++) {
-    if (s.phase !== "ROAM") return;
-    const due = advance(s, r);
-    if (due) { trigger(s, r, due); if (s.phase !== "ROAM") return; if (due === "sleep") return; }
-    else if (s.min % 30 === 20 && (maybeIncident(s, r) || maybeApproach(s, r))) { evRun(s, r); return; }
+function botChoose(s, p) {
+  const b = p.b;
+  const cands = living(s).filter((q) => q.id !== p.id);
+  if (isSab(p)) {
+    const heat = {};
+    for (const line of (s.meet && s.meet.chat) || []) if (line.about) heat[line.about] = (heat[line.about] || 0) + 1;
+    const hs = cands.filter((q) => !isSab(q)).sort((a, c) => ((heat[c.id] || 0) + (b.sus[c.id] || 0) / 20) - ((heat[a.id] || 0) + (b.sus[a.id] || 0) / 20));
+    if (hs.length && ((heat[hs[0].id] || 0) >= 1 || (b.sus[hs[0].id] || 0) >= 25)) return hs[0].id;
+    return R.chance(s, 0.6) || !hs.length ? "skip" : R.pick(s, hs).id;
   }
+  const ranked = cands.slice().sort((a, c) => (b.sus[c.id] || 0) - (b.sus[a.id] || 0));
+  const top = ranked.length ? b.sus[ranked[0].id] || 0 : 0, second = ranked.length > 1 ? b.sus[ranked[1].id] || 0 : 0;
+  if (top >= 25 && top - second >= 8) return ranked[0].id;
+  if (top >= 15 && top - second >= 8 && R.chance(s, 0.35)) return ranked[0].id;
+  return "skip";
 }
 
-function fastForward(s, r) {
-  const target = nextEventMin(s);
-  let guard = 0;
-  const day = s.day;
-  while (s.phase === "ROAM" && guard < 130) {
-    guard += 1;
-    const due = advance(s, r);
-    if (due) { trigger(s, r, due); if (s.phase !== "ROAM" || due === "sleep" || s.day !== day) return; }
-    else if (s.min % 30 === 20 && (maybeIncident(s, r) || maybeApproach(s, r))) { evRun(s, r); return; }
-    if (s.min >= target && s.phase === "ROAM" && !due) return;
+function tickMeetingBots(s) {
+  for (const p of s.ps) {
+    if (p.ctl !== "b" || !p.b || !p.alive || p.spec) continue;
+    const b = p.b;
+    while (b.plan.length && b.plan[0].at <= s.now && s.now - (p.lastChat || 0) >= 1200) {
+      const line = b.plan.shift();
+      chatLine(s, p, line.text, line.about ? { about: line.about, k: line.k } : undefined);
+      botsHear(s, s.meet.chat[s.meet.chat.length - 1]);
+    }
+    b.plan.sort((x, y) => x.at - y.at);
+    if (s.phase === "VOTE" && !p.voted && b.voteAt && s.now >= b.voteAt) applyVote(s, p, botChoose(s, p));
   }
 }
-
 // ---------------------------------------------------------------------------
-// The six exports
+// The six exports, plus the server clock tick and presence system actions.
 // ---------------------------------------------------------------------------
 
 export function setup(players) {
-  return { v: 1, phase: "LOBBY", pid: players[0] || "" };
+  return freshState(players.slice(), 0);
 }
 
-const PHASE_ACTIONS = {
-  LOBBY: ["start"],
-  EV: ["next", "skip", "pick", "score"],
-  ROAM: ["tick", "ff", "room", "talk", "listen", "buy", "rest", "do"],
-  END: [],
-};
+const OK = { ok: true };
+const no = (error) => ({ ok: false, error });
 
-function current(s) { return s.ev ? s.ev.q[s.ev.i] : null; }
-
-/** A beat that carries a result the player must see; skipping always stops on one. */
-function isKeyBeat(b) { return !!(b.key || b.focus || b.out || b.reveal || b.board || b.ledger || b.votes || b.team || b.missing || b.callers); }
-
-/** Skip ahead through talk to the next result, choice or mini-game. */
-function skipBeats(s, r) {
-  s.ev.i += 1;
-  evRun(s, r);
-  for (let guard = 0; s.ev && guard < 400; guard++) {
-    const it = current(s);
-    if (!it || !it.b || isKeyBeat(it.b)) return;
-    s.ev.i += 1;
-    evRun(s, r);
-  }
-}
-
-/** The set the show is on right now (beats can move it mid-event). */
-function stageNow(ev) {
-  let st = ev.stage;
-  for (let k = 0; k <= ev.i && k < ev.q.length; k++) if (ev.q[k].b && ev.q[k].b.stage) st = ev.q[k].b.stage;
-  return st;
-}
-
-export function validateAction(state, playerId, action) {
-  const s = state;
-  if (!action || typeof action !== "object" || typeof action.t !== "string") return { ok: false, error: "bad action" };
-  if (s.pid && playerId !== s.pid) return { ok: false, error: "not your season" };
-  const allowed = PHASE_ACTIONS[s.phase] || [];
-  if (!allowed.includes(action.t)) return { ok: false, error: `not now (${s.phase})` };
-  const a = action;
-  const me = s.hm ? s.hm[0] : null;
+export function validateAction(state, playerId, a) {
+  if (!a || typeof a !== "object" || typeof a.t !== "string") return no("bad action");
+  if (a.t.startsWith("_")) return no("not allowed");
+  const s = Object.assign({}, state, { now: Math.max(state.now || 0, Number(a._now) || 0) });
+  const p = pOf(s, playerId);
+  if (!p) return no("join first");
   switch (a.t) {
-    case "start": {
-      if (typeof a.name !== "string") return { ok: false, error: "name required" };
-      const n = a.name.trim();
-      if (n.length < 2 || n.length > 16) return { ok: false, error: "name must be 2-16 characters" };
-      if (!/^[\p{L}\p{N} .'-]+$/u.test(n)) return { ok: false, error: "letters and numbers only" };
-      if (a.look !== "f" && a.look !== "m") return { ok: false, error: "bad look" };
-      if (!["random", "housemate", "saboteur"].includes(a.fate)) return { ok: false, error: "bad fate" };
-      if (!isInt(a.seed)) return { ok: false, error: "bad seed" };
-      return { ok: true };
+    case "hello":
+      if (typeof a.name !== "string" || a.name.length > 40) return no("bad name");
+      if (a.look !== undefined && typeof a.look !== "string") return no("bad look");
+      if (!p.hello && !cleanName(a.name)) return no("Pick a name of 2 to 14 letters.");
+      return OK;
+    case "look":
+      if (s.phase !== "LOBBY") return no("not now");
+      if (!LOOKS.includes(a.look)) return no("bad look");
+      if (s.ps.some((q) => q !== p && q.look === a.look)) return no("Someone already picked that look.");
+      return OK;
+    case "opts":
+      if (s.phase !== "LOBBY") return no("not now");
+      if (s.host !== p.id) return no("Only the host can change settings.");
+      return OK;
+    case "start":
+      if (s.phase !== "LOBBY") return no("not now");
+      if (s.host !== p.id) return no("Only the host can start.");
+      if (!lobbyHumans(s).length) return no("Nobody is here.");
+      return OK;
+    case "again":
+      if (s.phase !== "END") return no("not now");
+      if (s.host !== p.id && !s.pub) return no("Only the host can restart.");
+      return OK;
+    case "p": {
+      const e = checkMove(s, p, a);
+      return e ? no(e) : OK;
     }
-    case "next": case "skip": { const it = current(s); return it && it.b ? { ok: true } : { ok: false, error: "nothing to advance" }; }
-    case "pick": {
-      const it = current(s);
-      if (!it || !it.c) return { ok: false, error: "no choice pending" };
-      const vals = it.c.o.map((o) => o.v);
-      if (it.c.n > 1) {
-        if (!Array.isArray(a.v) || a.v.length !== it.c.n) return { ok: false, error: `pick ${it.c.n}` };
-        if (new Set(a.v).size !== a.v.length) return { ok: false, error: "no duplicates" };
-        if (!a.v.every((x) => typeof x === "string" && vals.includes(x))) return { ok: false, error: "bad pick" };
-        return { ok: true };
-      }
-      if (typeof a.v !== "string" || !vals.includes(a.v)) return { ok: false, error: "bad pick" };
-      return { ok: true };
+    case "use": {
+      if (s.phase !== "PLAY" || p.spec) return no("not now");
+      if (!STATIONS[a.id] || STATIONS[a.id].kind === "bell") return no("no such station");
+      if (!nearStation(p, a.id)) return no("Get closer.");
+      const e = stationOpen(s, p, a.id);
+      return e ? no(e) : OK;
     }
-    case "score": {
-      const it = current(s);
-      if (!it || !it.m) return { ok: false, error: "no game running" };
-      if (it.m.g === "jollof") return isInt(a.v) && a.v >= 0 && a.v <= 6000 ? { ok: true } : { ok: false, error: "bad score" };
-      if (it.m.g === "dance") return isInt(a.v) && a.v >= 0 && a.v <= 100 ? { ok: true } : { ok: false, error: "bad score" };
-      if (it.m.g === "hustle") {
-        const v = a.v;
-        if (!v || typeof v !== "object" || !isInt(v.profit) || v.profit < 0 || v.profit > 8000000) return { ok: false, error: "bad profit" };
-        if (!isInt(v.skim) || v.skim < 0 || v.skim > 2000000 || (v.skim > 0 && me.role !== "S")) return { ok: false, error: "bad skim" };
-        return { ok: true };
-      }
-      return { ok: false, error: "bad game" };
+    case "done": {
+      if (s.phase !== "PLAY" || p.spec) return no("not now");
+      if (!p.act || p.act.id !== a.id) return no("Start it first.");
+      const st = STATIONS[a.id];
+      if (s.now - p.act.at < st.dur * 1000 * T.taskSlack) return no("Too fast.");
+      if (!nearStation(p, a.id, RANGE.use + 0.6)) return no("Get closer.");
+      const e = stationOpen(s, p, a.id);
+      return e ? no(e) : OK;
     }
-    case "tick": case "ff": return { ok: true };
-    case "do": {
-      if (typeof a.what !== "string" || !DOINGS[a.what]) return { ok: false, error: "bad activity" };
-      const why = canDo(s, a.what);
-      return why ? { ok: false, error: why } : { ok: true };
+    case "cancel":
+      return OK;
+    case "strike": {
+      const e = canStrike(s, p, pOf(s, a.who));
+      return e ? no(e) : OK;
     }
-    case "rest": {
-      if (me.out) return { ok: false, error: "you are out" };
-      if (me.room !== "bedroom" && me.room !== "gym") return { ok: false, error: "rest in the bedroom or work out in the gym" };
-      return { ok: true };
+    case "report":
+      if (s.phase !== "PLAY" || !p.alive || p.spec) return no("not now");
+      return bodyNear(s, p) ? OK : no("No body here.");
+    case "bell":
+      if (s.phase !== "PLAY" || !p.alive || p.spec) return no("not now");
+      if (!nearStation(p, "bell", RANGE.bell)) return no("Get to the bell in the lounge.");
+      if (p.bell <= 0) return no("You already rang the bell this game.");
+      if (s.sab) return no("Fix the sabotage first.");
+      if (s.now < s.bellAt) return no("The bell is cooling down.");
+      return OK;
+    case "sab": {
+      const e = canSabotage(s, p, a.k);
+      return e ? no(e) : OK;
     }
-    case "room": {
-      if (me.out) return { ok: false, error: "you are out" };
-      if (!ROAM_ROOMS.includes(a.room)) return { ok: false, error: "bad room" };
-      if (a.room === "hoh" && s.hoh !== ME && s.tenant !== ME) return { ok: false, error: "The HoH Lounge is locked." };
-      return { ok: true };
+    case "chat": {
+      const e = checkChat(s, p, a);
+      return e ? no(e) : OK;
     }
-    case "talk": {
-      if (typeof a.who !== "string" || typeof a.act !== "string" || !ACTS[a.act]) return { ok: false, error: "bad move" };
-      if (a.x !== undefined && typeof a.x !== "string") return { ok: false, error: "bad target" };
-      if (a.claim !== undefined && typeof a.claim !== "string") return { ok: false, error: "bad claim" };
-      const why = canTalk(s, a.who, a.act, a);
-      return why ? { ok: false, error: why } : { ok: true };
+    case "vote": {
+      const e = checkVote(s, p, a);
+      return e ? no(e) : OK;
     }
-    case "listen": {
-      if (!isInt(a.id)) return { ok: false, error: "bad scene" };
-      const sc = s.scenes.find((z) => z.id === a.id);
-      if (!sc || sc.until <= s.min || sc.d !== s.day) return { ok: false, error: "That conversation is over." };
-      if (me.out || sc.room !== me.room) return { ok: false, error: "You're too far away to hear." };
-      if (sc.heard) return { ok: false, error: "You already heard this one." };
-      return { ok: true };
-    }
-    case "buy": {
-      if (me.out) return { ok: false, error: "you are out" };
-      if (a.item === "peek") return me.coins >= 150 ? { ok: true } : { ok: false, error: "A Sneak Peek costs 150 coins." };
-      if (a.item === "immunity") {
-        if (me.immune) return { ok: false, error: "You are already immune." };
-        if (s.done["3:noms"]) return { ok: false, error: "Nominations are over this week." };
-        return me.coins >= 800 ? { ok: true } : { ok: false, error: "The Immunity Token costs 800 coins." };
-      }
-      return { ok: false, error: "bad item" };
-    }
+    default:
+      return no("unknown action");
   }
-  return { ok: false, error: "unknown action" };
 }
 
-export function applyAction(state, playerId, action) {
-  if (state.phase === "LOBBY") {
-    return initSeason(state.pid || playerId, { name: action.name.trim(), look: action.look, fate: action.fate, seed: action.seed });
+export function applyAction(state, playerId, a) {
+  // Movement is the hot path (several times a second per player): copy only what changes.
+  if (a.t === "p") {
+    const s = Object.assign({}, state, { now: Math.max(state.now || 0, Number(a._now) || 0) });
+    s.ps = state.ps.slice();
+    const i = s.ps.findIndex((q) => q.id === playerId);
+    if (i < 0) return state;
+    s.ps[i] = Object.assign({}, s.ps[i]);
+    applyMove(s, s.ps[i], a);
+    return s;
   }
   const s = clone(state);
-  const r = rngFrom(s.seed);
-  const a = action;
-  const me = s.hm[0];
-  s.last = a.t === "talk" ? s.last : null;
+  s.now = Math.max(s.now || 0, Number(a._now) || 0);
+  if (a.t === "_tick") { tick(s); return s; }
+  if (a.t === "_join") { join(s, playerId); bump(s); return s; }
+  if (a.t === "_leave") { leave(s, playerId); bump(s); return s; }
+  const p = pOf(s, playerId);
+  if (!p) return state;
   switch (a.t) {
-    case "next": s.ev.i += 1; evRun(s, r); break;
-    case "skip": skipBeats(s, r); break;
-    case "pick": {
-      const it = current(s);
-      s.ev.i += 1;
-      FN[it.c.h](s, r, a.v, it.c.ctx);
-      evRun(s, r);
+    case "hello":
+      if (s.phase === "LOBBY" || !p.hello || p.spec) hello(s, p, a);
       break;
-    }
-    case "score": {
-      const it = current(s);
-      s.ev.i += 1;
-      FN[it.m.h](s, r, a.v);
-      evRun(s, r);
-      break;
-    }
-    case "tick": run(s, r, 1); break;
-    case "ff": fastForward(s, r); break;
-    case "do": doThing(s, r, a.what); run(s, r, DOINGS[a.what].ticks); break;
-    case "rest": {
-      if (me.room === "bedroom") { me.comp = clamp(me.comp + 15); note(s, "You rested. Composure +15.", "good"); run(s, r, 6); }
-      else { me.comp = clamp(me.comp + 8); me.fans = clamp(me.fans + 1); note(s, "Good workout. Composure +8.", "good"); run(s, r, 3); }
-      break;
-    }
-    case "room": me.room = a.room; me.spot = 0; break;
-    case "talk": talk(s, r, a); break;
-    case "listen": listen(s, r, a.id); break;
-    case "buy": buy(s, r, a.item); break;
+    case "look": p.look = a.look; break;
+    case "opts": setOpts(s, a); break;
+    case "start": startRound(s); break;
+    case "again": toLobby(s); break;
+    case "use": p.act = { id: a.id, at: s.now }; break;
+    case "done": finishStation(s, p, a.id); break;
+    case "cancel": p.act = null; break;
+    case "strike": strike(s, p, pOf(s, a.who)); break;
+    case "report": startMeeting(s, p.id, "body", bodyNear(s, p).id); break;
+    case "bell": p.bell -= 1; startMeeting(s, p.id, "bell", null); break;
+    case "sab": sabotage(s, p, a.k); break;
+    case "chat": applyChat(s, p, a); break;
+    case "vote": applyVote(s, p, a.who); break;
   }
-  s.seed = r.state;
+  bump(s);
   return s;
 }
 
-export function isGameOver(state) {
-  if (!state || state.phase !== "END" || !state.result) return { over: false };
-  const res = state.result;
-  return { over: true, winner: res.out ? "house" : "you", headline: res.headline, grade: res.grade };
+/** A browser for this seat connected. Returning players get their body back. */
+function join(s, id) {
+  const p = pOf(s, id);
+  if (p) {
+    p.on = true; p.away = 0;
+    if (!p.bot && p.ctl === "b") { p.ctl = "h"; p.b = null; if (s.phase === "PLAY") feed(s, `${p.name} is back.`, "join"); }
+    return;
+  }
+  const q = newPlayer(id, false);
+  q.on = true;
+  if (s.phase !== "LOBBY") { q.spec = true; q.alive = false; }
+  s.ps.push(q);
 }
 
-// ---------------------------------------------------------------------------
-// What the browser is allowed to see
-// ---------------------------------------------------------------------------
+/** The last browser for this seat closed. */
+function leave(s, id) {
+  const p = pOf(s, id);
+  if (!p) return;
+  p.on = false; p.away = s.now;
+  if (s.phase === "LOBBY" || p.spec) {
+    s.ps = s.ps.filter((q) => q !== p);
+    if (p.hello && !p.spec) feed(s, `${p.name} left.`, "join");
+  }
+  if (s.host === id) { const next = s.ps.find((q) => !q.bot && q.on && q.hello); s.host = next ? next.id : null; }
+  if (s.phase === "LOBBY" && s.pub && !lobbyHumans(s).length) s.fillAt = 0;
+}
 
-const PUBLIC_KIND = { flirt: "flirt", kiss: "kiss", argue: "argue", gossip: "whisper", deal: "whisper", scheme: "whisper", bond: "chat", cry: "cry" };
+function tick(s) {
+  const dt = Math.min(0.5, Math.max(0, (s.now - (s.lastTick || s.now)) / 1000));
+  s.lastTick = s.now;
+  const before = s.phase;
+  switch (s.phase) {
+    case "LOBBY":
+      if (s.pub && s.fillAt && s.now >= s.fillAt && lobbyHumans(s).some((p) => p.on)) startRound(s);
+      break;
+    case "INTRO":
+      if (s.now >= s.ends) openPlay(s);
+      break;
+    case "PLAY":
+      for (const p of s.ps) {
+        if (!p.bot && !p.on && p.ctl === "h" && !p.spec && s.now - p.away > T.away) {
+          p.ctl = "b"; p.b = brainNew();
+          if (p.alive) feed(s, `${p.name}'s network dropped. AI is playing for them until they're back.`, "join");
+        }
+      }
+      tickPlay(s);
+      if (s.phase === "PLAY") tickBots(s, dt);
+      break;
+    case "MEET":
+      tickMeetingBots(s);
+      if (s.now >= s.ends) openVote(s);
+      break;
+    case "VOTE":
+      tickMeetingBots(s);
+      if (s.phase === "VOTE" && s.now >= s.ends) closeVote(s);
+      break;
+    case "RESULT":
+      if (s.now >= s.ends) afterResult(s);
+      break;
+    case "END":
+      if (s.pub && s.now >= s.ends) toLobby(s);
+      break;
+  }
+  if (s.phase !== before || s.moved || s.dirty) { bump(s); s.moved = false; s.dirty = false; }
+}
+
+export function isGameOver() {
+  return { over: false };
+}
+
+const SHOW_ALL = new Set(["INTRO", "MEET", "VOTE", "RESULT", "END"]);
 
 export function viewFor(state, playerId) {
   const s = state;
-  if (!s || s.phase === "LOBBY" || !s.hm) return { phase: "LOBBY" };
-  const me = s.hm[0];
-  const partner = me.role === "S" ? s.sabs.find((x) => x !== ME) : null;
-  const over = s.phase === "END";
-  const nomsPublic = s.done["3:nomreveal"] || s.day > 3;
-  const hm = s.hm.slice(1).map((h) => {
-    const v = rel(s, h.id, ME);
-    const badges = [];
-    if (s.hoh === h.id) badges.push("HOH");
-    if (s.tenant === h.id) badges.push("TENANT");
-    if (nomsPublic && s.noms.includes(h.id)) badges.push("NOMINATED");
-    if (h.strikes) badges.push("STRIKES " + h.strikes);
-    const sh = findShip(s, ME, h.id);
-    return {
-      id: h.id, name: h.name, out: h.out ? h.out.how : null, room: h.room, spot: h.spot, act: h.act, with: h.with, sc: h.sc, watch: h.watch || null,
-      badges, strikes: h.strikes,
-      feel: { f: level(v[F]), r: level(v[RO]), t: level(v[TR]), b: level(v[BF]) },
-      promised: s.prom[h.id + ">" + ME] === "save", squad: inSquad(s, h.id), ship: sh ? (sh.official ? "official" : "spark") : null,
-      role: over || h.id === partner || (h.out && h.out.how === "ejected") ? h.role : null,
-      sab: h.id === partner ? true : undefined,
-    };
-  });
-  const scenes = s.scenes.filter((sc) => sc.until > s.min && sc.d === s.day).map((sc) => ({ id: sc.id, k: PUBLIC_KIND[sc.k], room: sc.room, a: sc.a, b: sc.b, heard: sc.heard }));
-  const it = s.ev ? s.ev.q[s.ev.i] : null;
-  const ev = s.ev ? { k: s.ev.k, n: s.ev.n || 0, stage: s.ev.stage, stageNow: stageNow(s.ev), title: s.ev.title, i: s.ev.i, item: it ? { b: it.b, c: it.c ? Object.assign({}, it.c, { h: undefined, auto: undefined }) : undefined, m: it.m ? Object.assign({}, it.m, { h: undefined }) : undefined } : null } : null;
-  const nextM = nextEventMin(s);
-  const nextK = (SCHEDULE[s.day] || []).find(([m, k]) => m === nextM && !s.done[s.day + ":" + k]);
-  return {
-    phase: s.phase, day: s.day, dayName: DAYS[s.day], min: s.min, clock: hhmm(s.min), block: BLOCK_NAMES[blockOf(s.min)],
-    pot: s.pot,
-    you: {
-      name: me.name, look: me.look, role: me.role, partner, energy: me.energy, coins: me.coins, comp: me.comp, fans: me.fans,
-      strikes: me.strikes, room: me.room, immune: me.immune, out: me.out ? me.out.how : null,
-      hoh: s.hoh === ME, tenant: s.tenant === ME, nominated: nomsPublic && s.noms.includes(ME),
-      doings: Object.fromEntries(Object.keys(DOINGS).map((k) => [k, doneToday(s, k)])),
+  const me = pOf(s, playerId);
+  const base = { v: s.ver, phase: s.phase, now: s.now, ends: s.ends, fillAt: s.fillAt, pub: s.pub, host: s.host, opts: s.opts, round: s.round, bar: s.phase === "LOBBY" ? 0 : Math.round(taskBar(s) * 1000) / 1000, feed: s.feed };
+  if (!me) return Object.assign(base, { me: null, ps: s.ps.filter((p) => p.hello).map((p) => ({ id: p.id, name: p.name, look: p.look, bot: p.bot })) });
+  const ghost = !me.alive || me.spec;
+  const end = s.phase === "END";
+  const ps = [];
+  for (const p of s.ps) {
+    if (!p.hello) continue;
+    const o = { id: p.id, name: p.name, look: p.look, bot: p.bot, on: p.on };
+    if (s.phase !== "LOBBY") {
+      o.spec = p.spec || undefined;
+      o.alive = ghost || end || p.known || p.id === me.id ? p.alive : true;
+      if (!o.alive && p.ejected) o.ej = 1;
+      const show = p.id === me.id || (p.alive ? (ghost || SHOW_ALL.has(s.phase) || sees(s, me, p)) : ghost && !p.spec);
+      if (show && !p.spec) { o.x = p.x; o.z = p.z; o.f = p.f; o.mv = p.mv; }
+      if (end || (isSab(me) && isSab(p))) o.role = p.role;
+      if (s.phase === "VOTE" || s.phase === "RESULT") o.voted = p.voted ? 1 : 0;
+      if (s.meet && s.meet.seats) { const k = s.meet.seats.indexOf(p.id); if (k >= 0) o.seat = k; }
+    }
+    ps.push(o);
+  }
+  const view = Object.assign(base, {
+    me: {
+      id: me.id, name: me.name, look: me.look, hello: me.hello, role: s.phase === "LOBBY" ? null : me.role, alive: me.alive, spec: me.spec, ghost,
+      x: me.x, z: me.z, f: me.f, tp: me.tp, tasks: me.tasks, act: me.act, bell: me.bell,
+      cd: isSab(me) ? me.cd : 0, ej: me.ejected || undefined,
     },
-    dark: !!s.dark && s.dark > s.day * 1440 + s.min,
-    hm,
-    ships: s.ships.filter((sh) => sh.official || sh.a === ME || sh.b === ME).map((sh) => ({ a: sh.a, b: sh.b, name: sh.name, official: sh.official })),
-    beefs: s.beefs.slice(-20),
-    squad: s.squads.find((q) => q.members.includes(ME)) || null,
-    scenes, heard: s.heard, heardId: s.heardId || 0,
-    gb: s.gb, feed: s.feed.slice(-12), notes: s.notes.slice(-8), last: s.last,
-    hoh: s.hoh, tenant: s.tenant, noms: nomsPublic ? s.noms : [], teams: s.teams,
-    mission: s.mission ? { text: s.mission.text, done: !!s.mission.done, failed: !!s.mission.failed } : null,
-    lies: s.lies.map((l) => ({ to: l.to, about: l.about, c: l.c, exposed: l.exposed })),
-    ev, next: nextK ? { at: hhmm(nextK[0]), k: nextK[1] } : null,
-    log: s.log.slice(-15),
-    result: s.result,
-  };
+    ps,
+    vis: s.phase === "PLAY" ? visionOf(s, me) : 0,
+    bellAt: s.bellAt,
+    bodies: s.phase === "PLAY" ? s.bodies.filter((b) => ghost || seesPoint(s, me, b.x, b.z)).map((b) => ({ id: b.id, x: b.x, z: b.z })) : [],
+    sab: s.sab ? { k: s.sab.k, ends: s.sab.ends, fixed: s.sab.fixed } : null,
+  });
+  if (isSab(me)) view.sabAt = s.sabAt;
+  if (s.phase === "PLAY" && s.flash && s.flash.length) {
+    const fl = s.flash.filter((f) => s.now - f.at < 3000 && (ghost || f.to.includes(me.id) || f.id === me.id)).map((f) => ({ i: f.i, id: f.id }));
+    if (fl.length) view.flash = fl;
+  }
+  if (s.meet) {
+    view.meet = {
+      by: s.meet.by, kind: s.meet.kind, body: s.meet.body, room: s.meet.room,
+      chat: s.meet.chat.filter((c) => !c.g || ghost).map((c) => ({ i: c.i, w: c.w, t: c.t, g: c.g || undefined })),
+      myVote: me.voted,
+    };
+  }
+  if (s.res) view.res = { out: s.res.out, role: s.opts.reveal || end ? s.res.role : null, tally: s.res.tally, skips: s.res.skips, tie: s.res.tie };
+  if (s.end) view.end = { win: s.end.win, why: s.end.why, stats: s.stats };
+  return view;
 }

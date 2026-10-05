@@ -115,6 +115,11 @@ export const FURNITURE = [
   { t: "benchG", p: [29.5, 24.6], s: [2.4, 0.6], block: true },
   { t: "plant", p: [23.6, 9.2], s: [0.8, 0.8], block: true },
   { t: "lights", p: [0, 0], s: [0, 0] },
+  // Party mode: the generator NEPA always kills, two gas valves, and Mama Eye's bell.
+  { t: "gen", p: [35.25, 15], s: [0.9, 1.3], r: -Math.PI / 2, block: true },
+  { t: "valve", p: [0.18, 3], s: [0.3, 0.3], r: Math.PI / 2 },
+  { t: "valve", p: [35.75, 22], s: [0.3, 0.3], r: -Math.PI / 2 },
+  { t: "bell", p: [18.6, 5.6], s: [0.6, 0.6], block: true },
 ];
 
 /**

@@ -1,5 +1,6 @@
 #!/bin/sh
-# Concatenate the engine parts into the single-file logic.js the game template expects.
+# Concatenate the Party Mode engine into the single-file logic.js the game template expects.
+# (The original single-player engine lives on in engine/ but is no longer built.)
 cd "$(dirname "$0")"
-cat engine/01_data.js engine/02_lines.js engine/02b_voice.js engine/03_core.js engine/04_world.js engine/05_player.js engine/06_events.js engine/06b_drama.js engine/06c_day.js engine/07_api.js > app/src/logic.js
+cat party/01_core.js party/02_grid.js party/03_map.js party/04_lobby.js party/05_play.js party/06_meet.js party/07_bots.js party/08_api.js > app/src/logic.js
 echo "logic.js: $(wc -c < app/src/logic.js) bytes"

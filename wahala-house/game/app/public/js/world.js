@@ -307,6 +307,30 @@ export class World {
         add(g); break;
       }
       case "mat": { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), this.mat(PAL.magenta, { roughness: 1 })); m.rotation.x = -Math.PI / 2; m.position.set(x, 0.035, z); this.scene.add(m); break; }
+      case "gen": {
+        const g = grp();
+        part(g, RB(1.2, 0.8, 0.8, 0.06), this.mat(0xd8a21a, { roughness: 0.5, metalness: 0.3 }), 0, 0.45, 0);
+        part(g, RB(1.0, 0.12, 0.7, 0.03), this.mat(0x2a2a2e, { metalness: 0.5 }), 0, 0.9, 0);
+        part(g, new THREE.CylinderGeometry(0.05, 0.05, 0.5, 8), this.mat(0x3a3a3e, { metalness: 0.6 }), 0.42, 1.1, -0.2);
+        part(g, new THREE.BoxGeometry(0.3, 0.2, 0.04), this.mat(0x1fd16a, { emissive: 0x0a6a30, emissiveIntensity: 0.8 }), -0.3, 0.6, 0.41);
+        add(g); break;
+      }
+      case "valve": {
+        const g = grp();
+        part(g, new THREE.CylinderGeometry(0.06, 0.06, 1.6, 10), this.mat(0xc9c9cf, { metalness: 0.7, roughness: 0.3 }), 0, 0.8, 0);
+        const wheel = part(g, new THREE.TorusGeometry(0.16, 0.03, 8, 20), this.mat(0xd62f2f, { roughness: 0.4 }), 0, 1.1, 0.1);
+        wheel.rotation.x = 0;
+        part(g, new THREE.BoxGeometry(0.22, 0.14, 0.03), this.mat(0xf2b632), 0, 1.45, 0.07);
+        add(g); break;
+      }
+      case "bell": {
+        const g = grp();
+        part(g, new THREE.CylinderGeometry(0.22, 0.28, 0.9, 16), this.mat(0x2a1830, { roughness: 0.6 }), 0, 0.45, 0);
+        part(g, new THREE.CylinderGeometry(0.26, 0.26, 0.05, 20), this.mat(PAL.gold, { metalness: 0.6, roughness: 0.3 }), 0, 0.92, 0);
+        const btn = part(g, new THREE.SphereGeometry(0.15, 18, 12, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0xff2040, emissive: 0xff1030, emissiveIntensity: 0.9, roughness: 0.3 }), 0, 0.94, 0);
+        this.bellBtn = btn;
+        add(g); break;
+      }
       case "diarydoor": {
         const g = grp(); part(g, new THREE.BoxGeometry(1.2, 2.2, 0.1), this.mat(0x8a0f1f, { roughness: 0.6 }), 0, 1.1, 0);
         const light = new THREE.Mesh(new THREE.SphereGeometry(0.12, 16, 12), new THREE.MeshStandardMaterial({ color: 0xff2040, emissive: 0xff2040, emissiveIntensity: 2 }));
