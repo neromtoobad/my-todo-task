@@ -4,15 +4,23 @@ import sys, glob, os
 from PIL import Image
 OUT = sys.argv[1]
 MOODS = ["neutral", "happy", "flirty", "angry", "sad", "shock"]
+# Most sheets came back as the 3x2 grid we asked for. These came back 4x2
+# (eight faces); the cell each mood sits in, as (column, row):
+FOUR = {"tobi", "ivie", "ebi", "nedu", "zee", "pf"}
+CELL4 = {"neutral": (0, 0), "happy": (1, 0), "flirty": (2, 0), "angry": (0, 1), "sad": (1, 1), "shock": (3, 1)}
 for f in glob.glob("src/portraits_*.png"):
     k = os.path.basename(f)[len("portraits_"):-4]
     im = Image.open(f).convert("RGB")
     W, H = im.size
-    cw, ch = W / 3, H / 2
+    cols = 4 if k in FOUR else 3
+    cw, ch = W / cols, H / 2
     side = min(cw, ch) * 0.94
     for i, mood in enumerate(MOODS):
-        cx = (i % 3) * cw + cw / 2
-        cy = (i // 3) * ch + ch / 2
+        c, r = CELL4[mood] if cols == 4 else (i % 3, i // 3)
+        if k == "ebi" and mood == "angry": c, r = 3, 0  # her shouting face landed top right
+        cx = c * cw + cw / 2
+        # Tall cells: sit the square near the top so the hair stays in.
+        cy = r * ch + (side / 2 + ch * 0.03 if ch > side * 1.1 else ch / 2)
         box = (int(cx - side / 2), int(cy - side / 2), int(cx + side / 2), int(cy + side / 2))
         im.crop(box).resize((256, 256), Image.LANCZOS).save(f"{OUT}/portraits/{k}_{mood}.webp", quality=84)
 for f in glob.glob("src/tex_*.png"):
